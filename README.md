@@ -3,9 +3,10 @@
 **When IoT devices lose connectivity, the wrong recovery action can be worse than doing nothing.**
 
 SIMShift is an IoT connectivity recovery agent. At every step, **Strands Decider 2B** chooses the next investigation
-or recovery tool. **Strands Agents** executes exactly that tool, and **Amazon Bedrock** reviews profile-change plans
-and explains the outcome. The agent works on a deterministic digital twin of a cellular IoT fleet with virtual eSIM
-profiles. A hard policy decides what is admissible, so no model can switch a profile on its own authority.
+or recovery tool. **Strands Agents** executes exactly that tool, and **Amazon Bedrock** reviews profile-change plans,
+explains outcomes, and can run the whole agent loop without ever being able to pick a tool itself. The agent works on
+a deterministic digital twin of a cellular IoT fleet with virtual eSIM profiles. A hard policy decides what is
+admissible, so no model can switch a profile on its own authority.
 
 `#strands-decider-2b` `#tool-selection` · Submission for the AWS Builder Center *Agent Experience Hackathon: Strands Decider*
 
@@ -13,17 +14,21 @@ profiles. A hard policy decides what is admissible, so no model can switch a pro
 > synthetic. No carrier, eUICC, SM-DP+ or GSMA SGP.32 operation is performed or claimed. The Decider and Bedrock
 > calls are real.
 
+![Recovery Decision Inspector: Brazil cohort restored after a gated, human-approved profile switch](docs/screenshots/brazil-restored.png)
+
 ## Reusable Decider decision pattern
 
 **[`patterns/capability_aware_router/`](patterns/capability_aware_router/README.md)** is the reusable recipe:
 **CapabilityAwareRouter**, a tool-selection pattern with no telecom code. Its README covers the typed question format,
-the routing rule, the wiring and usage, and it ships with its own tests and a non-telecom example. The core is one
-file, [`router.py`](patterns/capability_aware_router/router.py).
+the routing rule, the wiring, how to adapt it, and how to let an LLM run the loop without letting it pick the tool.
+It ships with one test file per property and a non-telecom example. The core is one file,
+[`router.py`](patterns/capability_aware_router/router.py).
 
 ```
 state ─► policy removes inadmissible options (with reasons) ─► Decider `choice` over the rest
+      ─► answer checked against the question (options, sum, argmax, derived confidence)
       ─► confidence ≥ 0.5: act │ else: most probable read-only tool │ else: fallback
-         (an answer outside the offered options, or no answer at all, also goes to the fallback)
+         (no answer, a malformed or inconsistent answer, or an off-menu choice also goes to the fallback)
       ─► agent.tool.<selected>()  ─► same policy re-checked by a Strands InterventionHandler
 ```
 
@@ -51,83 +56,131 @@ Before Decider sees the options, the policy removes inadmissible ones. A profile
 - while the active profile registers normally;
 - before modem diagnostics show a registration reject cause.
 
-The same rules run again at the gate, together with owner authorization and human approval. Details:
-[docs/architecture.md](docs/architecture.md).
+The same rules run again at the gate, together with owner authorization and a human approval that is bound to that
+exact proposal. Every attempt records its eUICC transition path (`REQUESTED → … → VERIFYING → SUCCEEDED`, or
+`BLOCKED`, `ROLLED_BACK`, …). Details: [docs/architecture.md](docs/architecture.md).
+
+## Bedrock runs the loop; Decider still picks every tool
+
+In orchestrator mode ([`simshift/orchestrator.py`](simshift/orchestrator.py)) a Strands agent on Bedrock drives the
+incident. It sees exactly two tools, `get_incident_state` and `advance_recovery`, and **neither takes an argument**.
+Each `advance_recovery` call runs one policy → Decider → gated-tool step. Bedrock decides when to look, when to keep
+going and how to report; it has no way to name a recovery tool, skip the gate or approve a change. Tests drive the
+real Strands event loop with a scripted model to prove it ([`tests/test_orchestrator.py`](tests/test_orchestrator.py)).
 
 ## Observed runs (real Decider + Bedrock, synthetic fleet)
 
 | Scenario | What the agent did | Outcome |
 |---|---|---|
 | `BR_PROFILE` | Decider leans to `retry_connection` at conf 0.04, then 0.20, so the router runs the most probable read-only diagnostics instead. Modem shows reject #17. Decider picks `evaluate_profile_change` (conf 0.81). Bedrock review recommends proceeding as a staged change (advisory; the gate does not read it), gate + approval pass, virtual eIM enables profile_B | registration **and** app telemetry restored |
-| `OFFLINE` | device diagnostics and profile change excluded (no management path), reselection excluded (no allowed operator in coverage) → network-side check (conf 0.06, read-only) → escalate (conf 0.31, fallback) | no OTA change attempted |
-| `JP_INGEST` | retry and profile change excluded (registration healthy), reselection excluded (no allowed operator in coverage) → Decider picks `investigate_data_path` (conf 0.71) → ingestion regression found → modem check (conf 0.09, read-only) → escalate (only option left, no model call) | no network change; root cause handed off |
-| `DE_OPERATOR` | management rides on the failing cellular link, so device diagnostics and profile change are excluded → Decider leans to `try_allowed_operator` at conf 0.47, so the router runs the read-only network-side check → Decider picks `try_allowed_operator` (conf 0.62) | recovered without touching the eSIM |
+| `OFFLINE` | device diagnostics and profile change excluded (no management path) → network-side check (conf 0.06, read-only) → escalate (conf 0.31, fallback) | no OTA change attempted |
+| `JP_INGEST` | retry and profile change excluded (registration healthy) → Decider picks `investigate_data_path` (conf 0.71) → ingestion regression found → modem check (conf 0.09, read-only) → escalate (only option left) | no network change; root cause handed off |
+| `DE_OPERATOR` | management rides on the failing cellular link, so device diagnostics and profile change are excluded → read-only check at conf 0.47 → Decider picks `try_allowed_operator` (conf 0.62) | recovered without touching the eSIM |
+| `FW_LOOP` | modem diagnostics (conf 0.39, read-only) find a reset loop after a firmware rollout → retries and profile change excluded → data-path check → escalate | handed to the device team; no network or eSIM change |
+| `TRANSIENT` | Decider picks `retry_connection` (conf 0.79) | restored by one bounded retry |
 
-These are single runs on 2026-10-18, not a benchmark. Full traces are in [docs/sample-runs/](docs/sample-runs/).
-Per-step numbers, latencies and the known Decider misses are in [docs/measurements.md](docs/measurements.md).
+Single runs on 2026-10-18. Traces: [docs/sample-runs/](docs/sample-runs/) (Python loop) and
+[docs/sample-runs/orchestrated/](docs/sample-runs/orchestrated/) (Bedrock-orchestrated, all six scenarios).
+Per-step numbers, latencies and the known Decider misses: [docs/measurements.md](docs/measurements.md).
+
+## Benchmark: Decider vs Bedrock-only vs rules vs random
+
+60 generated incidents across the six families, every chooser running through the same router, policy and gate
+([full table and raw answers](docs/benchmark/benchmark-2026-10-18.md)):
+
+| | rules | random | **Decider** | Bedrock-only |
+|---|---:|---:|---:|---:|
+| Correct end state | 95.0% | 66.7% | **100.0%** | 95.0% |
+| First action acceptable | 95.0% | 46.7% | **86.7%** | 81.7% |
+| Chooser latency p50 | — | — | **100 ms** | 1,908 ms |
+| Bedrock tokens | 0 | 0 | **0** | 68,079 |
+| Forbidden executions (audited) | 0 | 0 | 0 | 0 |
+
+Decider's raw first pick was the preferred tool only half the time; the confidence routing turned its uncertain picks
+into read-only evidence gathering, and every incident ended correctly. Bedrock-only picked the preferred first tool
+more often (81.7%) but never retried first on transient incidents. **These are synthetic incidents from families we
+designed**, Decider ran on a laptop GPU and Bedrock in eu-central-1, and each chooser ran once. Read the caveats in
+[docs/measurements.md](docs/measurements.md#benchmark) before quoting any of it.
 
 ## Run it
 
 ```bash
-# 1. Decider server (pinned: strands-labs/strands-decider @ 930e6d5d)
+git clone https://github.com/HDGoldi/simshift-agent && cd simshift-agent
+make install                     # or: uv venv && uv pip install -e . pytest
+make test                        # 68 tests + trace validation; no Decider server or AWS needed
+make ui                          # Recovery Decision Inspector on recorded real Decider answers: http://127.0.0.1:8090
+make replay                      # re-run all six recorded traces against the current code
+```
+
+No GPU, no AWS account and no Decider server are needed for any of those. Replays re-run the real routing, policy and
+twin code against the Decider answers stored in a published trace, and stop if any question differs from the recording.
+
+Live, with the Decider server and Bedrock:
+
+```bash
+# 1. Decider server (pinned: strands-labs/strands-decider @ 930e6d5d), in its own terminal
 git clone https://github.com/strands-labs/strands-decider && cd strands-decider && git checkout 930e6d5d
 uv venv && uv pip install -e ".[mlx]"        # Apple silicon; elsewhere: uv pip install -e . and use --device cpu
 .venv/bin/strands-decider serve StrandsAgents/strands-decider-2B-qwen3.5-v1-2610 --device mlx --port 8099
 
-# 2. Agent: second terminal (the server stays in the foreground). Needs AWS credentials with Bedrock access.
-git clone https://github.com/HDGoldi/simshift-agent && cd simshift-agent
-uv venv && uv pip install -e . pytest
-AWS_PROFILE=<your-profile> .venv/bin/python -m simshift.agent BR_PROFILE --approve --out runs/br.json
+# 2. In simshift-agent. Needs AWS credentials with Bedrock access.
+AWS_PROFILE=<your-profile> .venv/bin/python -m simshift.agent BR_PROFILE --approve --out runs/br.json   # Python loop
+AWS_PROFILE=<your-profile> .venv/bin/python -m simshift.orchestrator BR_PROFILE --approve              # Bedrock runs the loop
+AWS_PROFILE=<your-profile> make ui-live                                                                # UI with real approval
 .venv/bin/python -m simshift.agent OFFLINE --no-bedrock
-```
-
-No GPU and no AWS account? Replay a recorded run. The agent re-runs the real routing, policy and twin code against
-the Decider answers stored in a published trace, and stops if any question differs from the one recorded:
-
-```bash
-.venv/bin/python -m simshift.agent BR_PROFILE --approve --no-bedrock --replay docs/sample-runs/BR_PROFILE.json
+AWS_PROFILE=<your-profile> .venv/bin/python -m simshift.benchmark --stamp mine                          # writes docs/benchmark/
 ```
 
 Settings: `DECIDER_URL` (default `http://127.0.0.1:8099`), `SIMSHIFT_BEDROCK_MODEL` (default
-`eu.anthropic.claude-haiku-5-5`), `AWS_REGION` (default `eu-central-1`). `--approve` is the human operator's
-pre-approval for a profile switch. Without it, the gate stops at `human_approval`.
+`eu.anthropic.claude-haiku-5-5`), `AWS_REGION` (default `eu-central-1`). On the CLI, `--approve` is the human
+operator's pre-approval for whatever profile switch gets proposed; without it the gate stops at `human_approval`.
+In the UI a person approves or declines the exact proposal in a dialog.
+
+The UI binds to 127.0.0.1 only and has no authentication. It shows the state sent to Decider, the removed options and
+why, Decider's probabilities, the route, the gate checklist, the eUICC transition path, counterfactuals on a cloned
+twin, and Bedrock's plan review and explanation.
+
+![OFFLINE: Decider escalates, and a forced profile change on a clone is blocked by the gate](docs/screenshots/offline-blocked.png)
 
 ## Tests
 
-`.venv/bin/pytest -q` runs 37 tests. They need no AWS credentials, and the real-Decider test skips when no server
-is running. The acceptance properties covered:
-- Decider's choice controls which Strands tool runs.
-- Excluded options are never offered and are denied on any call path.
-- Unreachable devices never get an OTA change.
-- A profile change needs approval, and the virtual eIM refuses an unapproved enable even when called directly.
-- Brazil restores both registration and telemetry.
-- No hidden truth reaches Decider or Bedrock prompts.
-- The twin is deterministic: replaying the same actions gives identical state and events.
-- The step limit escalates.
-- A Decider outage, a malformed answer, or an answer outside the offered options fails closed.
-- Each published trace in `docs/sample-runs/` replays through the current code to the same tools and outcome.
+`make test` runs 68 tests and validates every published trace. Without AWS credentials and a Decider server, 67 pass
+and the real-Decider test skips (set `SIMSHIFT_REQUIRE_DECIDER=1` to make that a failure). Bedrock is never called in
+tests. The acceptance properties covered:
+- Decider's choice controls which Strands tool runs; Bedrock in orchestrator mode cannot change it.
+- Excluded options are never offered and are denied on any call path; an independent audit counts violations.
+- Unreachable devices never get an OTA change, not even a forced one on a clone.
+- A profile change needs an approval bound to that exact proposal; the virtual eIM refuses an unapproved enable.
+- Brazil restores both registration and telemetry; a failed verification rolls back.
+- No hidden truth reaches Decider, Bedrock or the UI.
+- A Decider outage, a malformed or inconsistent answer, or an off-menu answer fails closed.
+- Every published trace replays through the current code to the same tools and outcome, and passes the validator.
 
 ## Repository layout
 
 ```
-patterns/capability_aware_router/   reusable Decider pattern (router, README, example, tests)
-simshift/agent.py                   Strands agent: loop, tools, Bedrock plan + explanation, CLI
-simshift/policy.py                  option descriptions, exclusions, profile-transition gate
-simshift/simulator.py               deterministic fleet twin + virtual eIM/IPA/eUICC, 4 scenarios
-tests/                              agent, twin and policy tests
-docs/                               architecture, measurements, submission checklist, sample traces
+patterns/capability_aware_router/   reusable Decider pattern (router, README, example, one test file per property)
+simshift/agent.py                   Incident (one steppable session), the six Strands tools, audit, CLI
+simshift/orchestrator.py            Bedrock-run loop with two zero-argument tools
+simshift/web.py, simshift/static/   Recovery Decision Inspector UI (stdlib HTTP server, no extra dependencies)
+simshift/policy.py                  option descriptions, exclusions, profile gate, transition paths, counterfactuals
+simshift/simulator.py               deterministic fleet twin + virtual eIM/IPA/eUICC, 6 scenarios
+simshift/benchmark.py               incident generator and the four-chooser benchmark
+simshift/validate.py                trace validator run in CI
+tests/                              agent, orchestrator, UI, twin, policy, benchmark and validator tests
+docs/                               architecture, measurements, benchmark, sample traces, screenshots, article, submission
 spikes/decider_spike.py             standalone Decider API probe used to validate the API
 ```
 
 ## Status and next steps
 
-Done: a working vertical slice, run locally (Decider on MLX, Bedrock in eu-central-1).
+Done: the agent, the pattern, six scenarios, the orchestrator mode, the UI, the benchmark, all run locally (Decider on
+MLX, Bedrock in eu-central-1).
 
 Next:
-- AWS hosting: agent on Bedrock AgentCore Runtime, Decider on an ECS Fargate CPU container.
-- A decision-trace UI.
-- Firmware-loop and transient-disruption scenarios.
-- Rules-only vs Bedrock-only vs Decider+Bedrock comparison on held-out cases.
+- AWS hosting: agent on Bedrock AgentCore Runtime, Decider on an ECS Fargate CPU container (plan in
+  [docs/architecture.md](docs/architecture.md#planned-aws-deployment-not-deployed-yet)). No AWS latency is claimed until then.
+- Publish the article ([draft](docs/article/article.md)) and record the video ([script](docs/article/video-script.md)).
 
 Submission status: [docs/hackathon-submission.md](docs/hackathon-submission.md).
 
