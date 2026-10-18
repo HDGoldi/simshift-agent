@@ -12,3 +12,4 @@ jobs:
           python-version: "3.13"
       - run: uv venv && uv pip install -e . pytest
       - run: .venv/bin/pytest -q   # real-Decider test skips; Bedrock is never called in tests
+      - run: shopt -s globstar && .venv/bin/python -m simshift.validate docs/sample-runs/**/*.json

@@ -120,7 +120,7 @@ def test_off_menu_choice_never_reaches_the_eim():
 SAMPLE_RUNS = os.path.join(os.path.dirname(__file__), "..", "docs", "sample-runs")
 
 
-@pytest.mark.parametrize("name", sorted(os.listdir(SAMPLE_RUNS)))
+@pytest.mark.parametrize("name", sorted(f for f in os.listdir(SAMPLE_RUNS) if f.endswith(".json")))
 def test_published_runs_replay_identically(name):
     from patterns.capability_aware_router.router import ReplayDecider
     rec = json.load(open(os.path.join(SAMPLE_RUNS, name)))
