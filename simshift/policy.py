@@ -124,4 +124,5 @@ def counterfactual(twin: FleetTwin, option: str) -> dict:
     else:
         result = actions[option]()
     return {"option": option, "excluded": exclusions(twin.observe()).get(option), "result": result,
-            "restored": c.service_restored(), "rates": c.rates(), "simulated_minutes": c.simulated_minutes()}
+            "restored": c.service_restored(), "rates": c.rates(),
+            "added_minutes": c.simulated_minutes() - twin.simulated_minutes()}

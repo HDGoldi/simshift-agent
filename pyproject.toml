@@ -16,6 +16,9 @@ pythonpath = ["."]
 [tool.setuptools]
 packages = ["simshift", "patterns", "patterns.capability_aware_router"]
 
+[tool.setuptools.package-data]
+simshift = ["static/*"]
+
 [build-system]
 requires = ["setuptools>=77"]
 build-backend = "setuptools.build_meta"
