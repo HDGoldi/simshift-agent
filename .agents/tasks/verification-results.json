@@ -1,0 +1,237 @@
+{
+  "iteration": 6,
+  "status": "quality_gates_passed_review_changes_requested",
+  "approvedReviewVerdict": "CHANGES_REQUESTED",
+  "reviewFindingsAddressed": [],
+  "openReviewFindings": ["SIM-016", "SIM-017", "SIM-018", "SIM-019"],
+  "commands": [
+    {
+      "command": "uv sync --frozen --extra dev",
+      "exit_code": 0,
+      "result": "PASS",
+      "evidence": "Checked 59 packages in 0.55ms"
+    },
+    {
+      "command": "uv run python -m simshift.cli validate-fixtures",
+      "exit_code": 0,
+      "result": "PASS",
+      "evidence": {"scenarios": ["BR_PROFILE", "OFFLINE"], "status": "VALID"}
+    },
+    {
+      "command": "uv run pytest -q",
+      "exit_code": 0,
+      "result": "PASS",
+      "evidence": "121 passed, 3 skipped in 1.13s"
+    },
+    {
+      "command": "uv run pytest -q patterns/capability_aware_router/tests",
+      "exit_code": 0,
+      "result": "PASS",
+      "evidence": "40 passed in 0.18s"
+    },
+    {
+      "command": "uv run ruff check .",
+      "exit_code": 0,
+      "result": "PASS",
+      "evidence": "All checks passed!"
+    },
+    {
+      "command": "uv run mypy src patterns/capability_aware_router",
+      "exit_code": 0,
+      "result": "PASS",
+      "evidence": "Success: no issues found in 47 source files"
+    },
+    {
+      "command": "uv run python scripts/check_license_headers.py",
+      "exit_code": 0,
+      "result": "PASS",
+      "evidence": "license headers valid: 92 files"
+    },
+    {
+      "command": "bash -n scripts/*.sh",
+      "exit_code": 0,
+      "result": "PASS",
+      "evidence": "no output"
+    },
+    {
+      "command": "uv run python -m simshift.cli policy-check --scenario OFFLINE --seed 20261019 --action evaluate_profile_change --approval granted",
+      "exit_code": 0,
+      "result": "PASS",
+      "evidence": "BLOCKED MANAGEMENT_UNREACHABLE; null transition; unchanged profile_A and state; approval not consumed; no command"
+    },
+    {
+      "command": "uv run pytest -q -m 'real_decider or production_path' -rs",
+      "exit_code": 0,
+      "result": "PASS_WITH_ACTIONABLE_SKIPS",
+      "evidence": "2 skipped, 122 deselected in 0.54s; set SIMSHIFT_RUN_PRODUCTION_PATH=1; set SIMSHIFT_RUN_REAL_DECIDER=1"
+    },
+    {
+      "command": "uv run pytest -q -m aws_integration -rs",
+      "exit_code": 0,
+      "result": "PASS_WITH_ACTIONABLE_SKIP",
+      "evidence": "1 skipped, 123 deselected in 0.50s; set SIMSHIFT_RUN_AWS_INTEGRATION=1"
+    },
+    {
+      "command": "test -x .agents/evidence/decider/runtime/venv/bin/python && test -d .agents/evidence/decider/model-v1-216d1ccb && test -d .agents/evidence/decider/hf-cache && test -f .agents/evidence/decider/decider-manifest.json",
+      "exit_code": 0,
+      "result": "PASS",
+      "evidence": "all explicitly declared local Decider prerequisites available"
+    },
+    {
+      "command": "PYTHONPATH=.agents/evidence/decider/repo/src HF_HUB_OFFLINE=1 TRANSFORMERS_OFFLINE=1 .agents/evidence/decider/runtime/venv/bin/python -m strands_decider.hf_export verify .agents/evidence/decider/model-v1-216d1ccb",
+      "exit_code": 0,
+      "result": "PASS",
+      "evidence": ".agents/evidence/decider/model-v1-216d1ccb: ok"
+    },
+    {
+      "command": "bounded literal-loopback local Decider; enabled real_decider and production_path pytest; scripts/capture-local-evidence.sh",
+      "exit_code": 0,
+      "result": "PASS_WITH_KNOWN_REVIEW_INACCURACIES",
+      "evidence": "2 passed, 122 deselected in 18.52s; BR RESTORED on profile_B; OFFLINE ESCALATED on unchanged profile_A; traces regenerated"
+    },
+    {
+      "command": "uv run python scripts/validate_trace.py .agents/evidence/vertical-slice/br-profile.jsonl .agents/evidence/vertical-slice/offline-run.jsonl .agents/evidence/vertical-slice/offline-policy-check.json",
+      "exit_code": 0,
+      "result": "PASS_WITH_KNOWN_VALIDATOR_GAP",
+      "evidence": "validated real Decider BR/OFFLINE evidence; validator still accepts SIM-016 reversed ordering"
+    },
+    {
+      "command": "sha256sum .agents/evidence/vertical-slice/br-profile.jsonl .agents/evidence/vertical-slice/offline-run.jsonl .agents/evidence/vertical-slice/offline-policy-check.json uv.lock .agents/evidence/decider/decider-manifest.json .agents/evidence/decider/files.manifest.json",
+      "exit_code": 0,
+      "result": "PASS",
+      "evidence": "all six hashes recorded"
+    },
+    {
+      "command": "uv run python -c 'import json; from pathlib import Path; paths=[Path(\".agents/evidence/vertical-slice/br-profile.jsonl\"),Path(\".agents/evidence/vertical-slice/offline-run.jsonl\")];\\nfor path in paths:\\n events=[json.loads(line) for line in path.read_text().splitlines()]; start=events[0][\"payload\"]; req=next(e[\"payload\"] for e in events if e[\"event_type\"]==\"decider_request\"); response=next(e[\"payload\"] for e in events if e[\"event_type\"]==\"decider_response\"); print(path, start[\"environment_evidence_hash\"], req[\"request_hash\"], response[\"model_choice\"])'",
+      "exit_code": 0,
+      "result": "PASS",
+      "evidence": "environment hashes, request hashes, and actual model choices recorded"
+    },
+    {
+      "command": "uv run python -c 'import json; from pathlib import Path; p=Path(\".agents/evidence/vertical-slice/br-profile.jsonl\"); events=[json.loads(x) for x in p.read_text().splitlines()];\\nfor e in events:\\n if e[\"event_type\"] in {\"transition_state_changed\",\"registration_check_completed\",\"telemetry_check_completed\",\"approval_materialized\"}: print(e[\"sequence\"],e[\"event_type\"],e[\"payload\"])'",
+      "exit_code": 0,
+      "result": "PASS",
+      "evidence": "printed sequence 10 and confirmed SIM-019 lowercase approval source; direct trace inspection confirmed SIM-016 sequences 28-30"
+    },
+    {
+      "command": "uv run python -m json.tool .agents/tasks/verification-results.json >/dev/null",
+      "exit_code": 0,
+      "result": "PASS",
+      "evidence": "no output"
+    },
+    {
+      "command": "test -s .agents/tasks/final-evidence.md && test -s .agents/tasks/verification-results.json",
+      "exit_code": 0,
+      "result": "PASS",
+      "evidence": "no output"
+    }
+  ],
+  "opt_in": {
+    "real_decider": {
+      "status": "PASSED",
+      "label": "REAL",
+      "evidence": "actual returned labels invoked matching registered Strands tools through the real literal-loopback Decider"
+    },
+    "production_path": {
+      "status": "PASSED_WITH_OPEN_REVIEW_FINDINGS",
+      "evidence": "BR reached RESTORED and OFFLINE safely escalated, but BR trace retains SIM-016 and SIM-019 inaccuracies"
+    },
+    "aws_integration": {
+      "status": "NOT_RUN",
+      "label": "UNVERIFIED",
+      "skip": "set SIMSHIFT_RUN_AWS_INTEGRATION=1",
+      "blocked_by": "explicit AWS credentials and authorization were not supplied"
+    }
+  },
+  "environmentEvidence": {
+    "hash": "e84a35a2e982935ad766796035b7d848658c70f74aae865179ad8838aa5e736b",
+    "lockfileSha256": "12def5766be3ee5947e6cf3773bd32fe86481229c8f5c8c423c5c958db6b5190",
+    "trustedManifestSha256": "146ce9b86bf671a4d577036e390a940e88461984b8a71040f0de285227426156",
+    "explainerMode": "local-test-double",
+    "retainedInRunStarted": true
+  },
+  "trustChain": {
+    "manifest": ".agents/evidence/decider/decider-manifest.json",
+    "manifestSha256": "146ce9b86bf671a4d577036e390a940e88461984b8a71040f0de285227426156",
+    "fileManifest": ".agents/evidence/decider/files.manifest.json",
+    "fileManifestSha256": "1814b697efce120356087f7a2f4d313d715b1c2b9f03f66f7884cf91b82a5a10",
+    "exportVerification": "PASSED",
+    "baseBytes": "CONTENT_VERIFIED",
+    "baseRepositoryRevision": "INFERRED_NOT_INDEPENDENTLY_VERIFIED"
+  },
+  "traces": [
+    {
+      "path": ".agents/evidence/vertical-slice/br-profile.jsonl",
+      "status": "OBSERVED_VALIDATOR_ACCEPTED_WITH_KNOWN_REVIEW_INACCURACIES",
+      "sha256": "7e4776d39ee48b0d4b1f91cf396993cfc91d53973a35f38aed4577886dc013e6",
+      "knownIssues": ["SIM-016", "SIM-019"]
+    },
+    {
+      "path": ".agents/evidence/vertical-slice/offline-run.jsonl",
+      "status": "OBSERVED_VALIDATED_EXACT_BODIES",
+      "sha256": "414a3ff240b311714e1d6d69ea804d35368600a52fe758f96e63d0dd363664bb"
+    },
+    {
+      "path": ".agents/evidence/vertical-slice/offline-policy-check.json",
+      "status": "OBSERVED_VALIDATED",
+      "sha256": "f35cfeb2e9b78efdff0441f7868b68e41d36fb7881574e30b026ea2d8ea41775"
+    }
+  ],
+  "componentLabels": {
+    "decider": "REAL",
+    "strands_framework_dispatch": "REAL",
+    "strands_tool_host_model": "LOCAL_TEST_DOUBLE",
+    "explainer_model": "LOCAL_TEST_DOUBLE",
+    "telecom_simulator": "SIMULATED",
+    "approval": "SIMULATED",
+    "aws_deployment": "UNVERIFIED",
+    "real_bedrock": "UNVERIFIED",
+    "real_telecom": "UNVERIFIED"
+  },
+  "reviewFindings": [
+    {
+      "id": "SIM-016",
+      "status": "OPEN_CONFIRMED",
+      "evidence": "BR sequence 28 emits VERIFYING->SUCCEEDED before registration and telemetry checks at sequences 29 and 30; validator accepts it"
+    },
+    {
+      "id": "SIM-017",
+      "status": "OPEN_CONFIRMED",
+      "evidence": "production trace and explainer sink checks supply no canaries; TraceRecorder defaults to an empty canary tuple"
+    },
+    {
+      "id": "SIM-018",
+      "status": "OPEN_CONFIRMED",
+      "evidence": "DeciderClient.choose does not recursively require string object keys before json.dumps"
+    },
+    {
+      "id": "SIM-019",
+      "status": "OPEN_CONFIRMED",
+      "evidence": "BR approval_materialized sequence 10 uses scripted_simulated_intent and schema does not constrain source"
+    }
+  ],
+  "deferredPhase2Aws": [
+    "Hugging Face cache and offline-mode hardening",
+    "stage-zero and AMI contracts",
+    "EC2 describe-only IAM characterization",
+    "private endpoints",
+    "offline bundle and Merkle validation",
+    "normative cloud OFFLINE characterization"
+  ],
+  "limitations": [
+    "The approved code-review verdict remains CHANGES_REQUESTED despite passing automated gates.",
+    "AWS deployment and real Bedrock execution remain UNVERIFIED.",
+    "All telecom behavior and approval are SIMULATED.",
+    "The retained base-model Hub revision is inferred, not independently proven.",
+    "Accuracy, performance, cost, GPU behavior, and production readiness are UNVERIFIED."
+  ],
+  "prohibited_actions": {
+    "git": false,
+    "cloud_mutation": false,
+    "deployment": false,
+    "provisioning": false,
+    "publication": false,
+    "article": false,
+    "video": false
+  }
+}

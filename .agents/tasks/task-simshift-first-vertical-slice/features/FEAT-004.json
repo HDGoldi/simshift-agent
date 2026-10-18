@@ -1,0 +1,31 @@
+{
+  "id": "FEAT-004",
+  "type": "test",
+  "description": "Add honest opt-in real Decider/production/Bedrock verification, capture non-fabricated local evidence when available, update implementation documentation, preserve AWS deployment hardening as an explicit non-blocking Phase 2 backlog, and complete the local quality/evidence report. This depends on all earlier features.",
+  "status": "completed",
+  "steps": [
+    "Add foreground local Decider and evidence scripts plus pytest fixtures that use an already running service or explicit pinned runtime/model/cache; default tests download nothing.",
+    "Add label-agnostic real_decider wiring tests, semantic BR/OFFLINE production_path tests, and already-deployed-only aws_integration tests. Missing opt-in variables skip with exact setup instructions; once opted in, missing or mismatched prerequisites fail and no fake result may pass.",
+    "Capture BR_PROFILE recovery and OFFLINE run/forced-policy traces only from the real local Decider path when prerequisites are available; otherwise record NOT RUN and the exact remediation command.",
+    "Update README and current docs to match actual status/provenance and add infra/ec2 documentation that defers HF offline cache, stage zero/AMI, EC2 describe IAM, private endpoint/bundle/Merkle work, and cloud OFFLINE characterization to Phase 2 without claiming deployment artifacts are complete.",
+    "Run fixture validation, all default tests, pattern tests, ruff, mypy, license checks, and bash syntax checks; write final-evidence.md and verification-results.json with command outcomes, skips, trace hashes, and limitations."
+  ],
+  "acceptance_criteria": [
+    "Default pytest passes offline and opt-in markers skip with actionable messages; after opt-in, configuration/service/model/Bedrock failures fail rather than skip.",
+    "When the preserved real Decider runtime is usable, the real tests prove actual-label Strands dispatch, BR RESTORED, and OFFLINE no-transition escalation and retain raw traces; otherwise evidence says NOT RUN without fabricated output.",
+    "All local tests, lint, mypy, license validation, and shell syntax checks pass.",
+    "AWS/Bedrock deployment remains UNVERIFIED and no Git, cloud mutation, deployment, publication, article, or video action occurs.",
+    "The final evidence report distinguishes REAL, LOCAL_TEST_DOUBLE, SIMULATED, OBSERVED, and UNVERIFIED components."
+  ],
+  "verification": [
+    "uv run pytest -q",
+    "uv run pytest -q patterns/capability_aware_router/tests",
+    "uv run pytest -q -m aws_integration",
+    "uv run ruff check .",
+    "uv run mypy src patterns/capability_aware_router",
+    "uv run python scripts/check_license_headers.py",
+    "bash -n scripts/*.sh"
+  ],
+  "blocked_reason": null,
+  "findings": "Implemented opt-in foreground Decider launch/capture scripts; exact skip/fail pytest fixtures; label-agnostic real_decider, semantic BR/OFFLINE production_path, already-deployed-only aws_integration, and marker-contract tests; trace/license validators; current-status docs; and a non-blocking Phase 2 EC2 backlog. Exact verification from /projects/sandbox/simshift-agent: uv sync --frozen --extra dev PASS (Checked 59 packages); fixture validation PASS (BR_PROFILE and OFFLINE VALID); uv run pytest -q PASS (96 passed, 3 skipped in 0.72s); standalone pattern tests PASS (40 passed in 0.11s); uv run pytest -q -m aws_integration PASS (1 skipped, 98 deselected in 0.43s); ruff PASS; mypy PASS (47 source files); license check PASS (91 files); bash -n scripts/*.sh PASS. Explicit -rs evidence recorded exact skips: set SIMSHIFT_RUN_REAL_DECIDER=1, set SIMSHIFT_RUN_PRODUCTION_PATH=1, and set SIMSHIFT_RUN_AWS_INTEGRATION=1. CLI help/example help PASS. OFFLINE forced policy PASS with BLOCKED/MANAGEMENT_UNREACHABLE, null transition, unchanged profile_A, no command, and no consumed approval. Real BR/OFFLINE trace capture is NOT RUN because no already-running service/trusted local deployment manifest was supplied; capture failed actionably with the required STRANDS_DECIDER_URL setup and no files or hashes were fabricated. Exact remediation commands, component labels, limitations, and null trace hashes are in .agents/tasks/final-evidence.md and verification-results.json. Later handoff: provide a trusted manifest matching the preserved model/service, run the foreground launcher in terminal 1 and capture-local-evidence.sh in terminal 2; AWS/Bedrock remains UNVERIFIED and all HF bundle/AMI/endpoints/Merkle/cloud OFFLINE work stays deferred to Phase 2."
+}

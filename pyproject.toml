@@ -1,21 +1,52 @@
-[project]
-name = "simshift"
-version = "0.1.0"
-description = "SIMShift: capability-aware IoT connectivity recovery agent (Strands Decider 2B + Amazon Bedrock) on a synthetic digital twin"
-requires-python = ">=3.12"
-license = "Apache-2.0"
-dependencies = ["strands-agents==1.61.1", "pydantic>=2"]
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
 
-[dependency-groups]
-dev = ["pytest>=8"]
+[project]
+name = "simshift-agent"
+version = "0.1.0"
+description = "A capability-aware recovery routing vertical slice"
+readme = "README.md"
+requires-python = ">=3.11,<3.12"
+license = { text = "Apache-2.0" }
+dependencies = [
+  "pydantic==2.14.1",
+  "strands-agents==1.61.1",
+]
+
+[project.optional-dependencies]
+dev = [
+  "mypy==2.4.0",
+  "pytest==9.1.1",
+  "ruff==0.17.1",
+]
+
+[project.scripts]
+simshift = "simshift.cli:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/simshift", "patterns"]
 
 [tool.pytest.ini_options]
+addopts = "--strict-markers"
 testpaths = ["tests", "patterns/capability_aware_router/tests"]
-pythonpath = ["."]
+markers = [
+  "real_decider: opt-in tests against a real local Decider service",
+  "production_path: opt-in semantic production-path tests",
+  "aws_integration: opt-in tests against pre-authorized AWS resources",
+]
 
-[tool.setuptools]
-packages = ["simshift", "patterns", "patterns.capability_aware_router"]
+[tool.ruff]
+target-version = "py311"
+line-length = 100
 
-[build-system]
-requires = ["setuptools>=77"]
-build-backend = "setuptools.build_meta"
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
+
+[tool.mypy]
+python_version = "3.11"
+strict = true
+packages = ["simshift", "patterns.capability_aware_router"]
+
+[tool.uv]
+package = true

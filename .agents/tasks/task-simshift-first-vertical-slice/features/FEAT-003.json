@@ -1,0 +1,27 @@
+{
+  "id": "FEAT-003",
+  "type": "feat",
+  "description": "Integrate the canonical real Decider adapter with six directly invoked Strands-registered tools, the bounded production coordinator, terminal safety behavior, CLI, and optional no-tools Bedrock explanation. This depends on FEAT-001 and FEAT-002.",
+  "status": "completed",
+  "steps": [
+    "Implement ToolServices, six exact keyword-only @tool closures, LocalTestDoubleModel, real Strands Agent registration, fixed direct agent.tool dispatch, local explainer, and real no-tools Bedrock explainer.",
+    "Implement SimshiftDeciderAdapter using the FEAT-001 client for trusted manifest/health checks, retries, projection, response conversion, and tracing; do not add a production fake.",
+    "Implement model_choice/effective_choice policy, runner budgets, proposal/approval/transition/check orchestration, and argparse run/policy-check/validate-fixtures commands.",
+    "Make every final profile-gate denial terminal: proposal_blocked followed by run_escalated(PROFILE_PROPOSAL_BLOCKED), no second Decider call, proposal, or tool dispatch.",
+    "Add unit/integration tests proving all six causal routes, zero host/Bedrock model calls before or during dispatch, complete approved BR recovery, and OFFLINE forced-proposal MANAGEMENT_UNREACHABLE blocking with unchanged state."
+  ],
+  "acceptance_criteria": [
+    "Each admissible returned label invokes exactly the matching registered Strands tool once, with no Bedrock tool selection.",
+    "The local tool-host model is labeled LOCAL_TEST_DOUBLE and invocation count zero while strands_framework_dispatch is REAL.",
+    "Approved deterministic BR reaches RESTORED only after both checks; OFFLINE forced profile evaluation returns BLOCKED/MANAGEMENT_UNREACHABLE with no transition or profile mutation.",
+    "Denied BR creates exactly one proposal and blocked audit, emits PROFILE_PROPOSAL_BLOCKED escalation, and performs no second model/tool call.",
+    "Production code contains no fake Decider and local-double mode still requires the real loopback Decider service."
+  ],
+  "verification": [
+    "uv run pytest -q tests/unit/test_tool_services.py tests/unit/test_strands_registration.py tests/unit/test_direct_dispatch.py tests/unit/test_bedrock_boundary.py",
+    "uv run pytest -q tests/unit/test_decision_coordinator.py tests/unit/test_runner_bounds.py tests/unit/test_terminal_gate_denial.py tests/unit/test_offline_forced_proposal.py tests/unit/test_cli.py tests/integration/test_local_vertical_slice.py",
+    "uv run python -m simshift.cli policy-check --scenario OFFLINE --seed 20261019 --action evaluate_profile_change --approval granted"
+  ],
+  "blocked_reason": null,
+  "findings": "Completed FEAT-003 only. Added the production loopback Decider adapter with strict pinned schema-1.1 manifest parsing, one cached exact health check, bounded 0.25/0.50-second transient retries, observable-only projection, and adapter evidence; no production fake was added. Added run-scoped ToolServices, six exact keyword-only Strands @tool closures, registry assertion, explicit fixed agent.tool dispatch, an inert LOCAL_TEST_DOUBLE host model, deterministic local explanation, and a separate no-tools Bedrock explainer. Added model/effective-choice coordination, four-step bounded runner, proposal-bound approval/atomic transition/eUICC/check orchestration, terminal PROFILE_PROPOSAL_BLOCKED behavior, and run/policy-check/validate-fixtures CLI commands. Added test-only injected Decider/model helpers under tests/fakes. Later-step handoff: SimshiftDeciderAdapter is the real provider accepted by DecisionCoordinator; SimshiftRunner accepts that coordinator and emits strict TraceEvent tuples suitable for TraceRecorder. The run CLI requires --decider-url, --decider-manifest, --explainer, and --trace-out. A trusted local manifest and opt-in real Decider launch/evidence remain later-step work; no cloud mutation, deployment, or offline-bundle hardening was performed. Exact required verification evidence on final code: (1) `uv run pytest -q tests/unit/test_tool_services.py tests/unit/test_strands_registration.py tests/unit/test_direct_dispatch.py tests/unit/test_bedrock_boundary.py` exited 0 with `11 passed in 0.40s`; (2) `uv run pytest -q tests/unit/test_decision_coordinator.py tests/unit/test_runner_bounds.py tests/unit/test_terminal_gate_denial.py tests/unit/test_offline_forced_proposal.py tests/unit/test_cli.py tests/integration/test_local_vertical_slice.py` exited 0 with `9 passed in 0.43s`; (3) `uv run python -m simshift.cli policy-check --scenario OFFLINE --seed 20261019 --action evaluate_profile_change --approval granted` exited 0 and printed exactly `{\"approval_consumed\": false, \"command_created\": false, \"final_profile\": \"profile_A\", \"initial_profile\": \"profile_A\", \"profile_unchanged\": true, \"reason\": \"MANAGEMENT_UNREACHABLE\", \"reasons\": [\"MANAGEMENT_UNREACHABLE\"], \"state_unchanged\": true, \"status\": \"BLOCKED\", \"transition_id\": null}`. Additional final checks: `uv run pytest -q` exited 0 with `92 passed in 0.70s`; `uv run ruff check .` exited 0 with `All checks passed!`; `uv run mypy src patterns/capability_aware_router` exited 0 with `Success: no issues found in 47 source files`."
+}

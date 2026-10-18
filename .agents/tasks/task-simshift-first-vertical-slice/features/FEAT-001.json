@@ -1,0 +1,25 @@
+{
+  "id": "FEAT-001",
+  "type": "feat",
+  "description": "Create the reproducible Python package and the independent CapabilityAwareRecoveryRouter, including the canonical strict loopback Decider client, capacity handling, exact registry dispatch, tests, and a non-telecom example. This feature is foundational and must remain importable without simshift.",
+  "status": "completed",
+  "steps": [
+    "Create pyproject.toml, uv.lock, Apache-2.0 LICENSE/NOTICE, package initializers, and exact Python 3.11 runtime/dev configuration from plan item 1.",
+    "Implement patterns/capability_aware_router/schemas.py, filters.py, trace.py, decider_client.py, and router.py with strict frozen DTOs, exact filter partitions, literal-loopback transport, bounded duplicate-safe JSON parsing, trusted capacity, model/effective choice policy, and immutable callback mapping.",
+    "Add the document-processing example and README without importing simshift.",
+    "Add standalone tests for schema/filter behavior, malformed HTTP, confidence validation, 0/1/2/24/25/255 choices at capacity 24, low confidence, forbidden labels, and exact one-callback dispatch."
+  ],
+  "acceptance_criteria": [
+    "uv sync --frozen --extra dev succeeds on Python 3.11 from uv.lock.",
+    "All tests under patterns/capability_aware_router/tests pass without network, model downloads, or AWS credentials.",
+    "Counts below two and above trusted capacity make no HTTP or callback call and never fabricate or reduce options.",
+    "The non-telecom example imports no simshift module and exposes usable help."
+  ],
+  "verification": [
+    "uv sync --frozen --extra dev",
+    "uv run pytest -q patterns/capability_aware_router/tests",
+    "uv run python -m patterns.capability_aware_router.examples.document_processing --help"
+  ],
+  "blocked_reason": null,
+  "findings": "Implemented the Python 3.11 Hatch/uv src-layout package, generated uv.lock with exact direct pins (pydantic 2.14.1, strands-agents 1.61.1, pytest 9.1.1, ruff 0.17.1, mypy 2.4.0), added Apache-2.0 LICENSE/NOTICE and CPU/CUDA constraint placeholders. The standalone pattern has frozen strict DTOs, exact partition construction, portable causal trace validation, canonical one-attempt loopback HTTP transport, strict duplicate-safe finite JSON, 64 KiB response and request/state bounds, health/model/probability/confidence validation, trusted-capacity no-decision handling, immutable callback registration, and separate model/effective choices. The document example imports only the pattern and standard library. Exact required verification evidence: `uv sync --frozen --extra dev` exited 0 on CPython 3.11.15, built simshift-agent, and installed 59 locked packages; final `uv run pytest -q patterns/capability_aware_router/tests` exited 0 with `40 passed in 0.14s`; final `uv run python -m patterns.capability_aware_router.examples.document_processing --help` exited 0 and printed usage with loopback URL, parser capability, and confidence-floor options. Additional evidence: `uv run python -c \"import simshift; import patterns.capability_aware_router\"` exited 0; `uv run ruff check patterns/capability_aware_router src/simshift tests` exited 0 with `All checks passed!`; `uv run mypy src patterns/capability_aware_router` exited 0 with `Success: no issues found in 17 source files`. Later-step handoff: SIMShift's adapter should import DeciderClient rather than duplicate transport/parsing, wrap its one-attempt choose/health calls with manifest consistency and retry policy, and pass manifest-verified health.model and health.num_slots into CapabilityAwareRouter. Domain filters should construct results with FilterResult.from_partition; Strands dispatch adapters should build explicit ToolRegistry callbacks. The declared simshift console target remains reserved for FEAT-009, which must add src/simshift/cli.py. No Git repository was initialized and no cloud, deployment, publication, or offline-bundle hardening work was performed."
+}

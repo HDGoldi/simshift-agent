@@ -1,0 +1,41 @@
+{
+  "state": {
+    "incident": "Persistent cellular attach failures",
+    "country": "BR",
+    "attach_success_rate": 0.04,
+    "allowed_alternative_operator_available": false,
+    "alternative_profile_installed": true,
+    "management_path_reachable": true,
+    "attempted_retries": 3
+  },
+  "model": "client-value-is-not-routing",
+  "questions": {
+    "next_recovery_step": {
+      "type": "choice",
+      "instructions": "Given the observed incident state, which permitted next step is most useful for safely advancing service restoration?",
+      "criteria": {
+        "retry_connection": "Retry the failing active subscription with bounded backoff",
+        "investigate_device": "Gather more modem and device evidence",
+        "evaluate_profile_change": "Evaluate feasibility of an alternate installed profile without executing it",
+        "escalate_or_wait": "Defer action or request human review"
+      }
+    },
+    "evidence_sufficient": {
+      "type": "noul",
+      "instructions": "Is the observed evidence sufficient to choose a next diagnostic or recovery step?",
+      "criteria": {
+        "true": "there is enough observed evidence to select a useful next step",
+        "false": "important evidence is missing and no useful next step can be selected"
+      }
+    },
+    "intervention_level": {
+      "type": "score",
+      "instructions": "How invasive should the next step be, given only the observed evidence?",
+      "criteria": [
+        "read-only investigation or waiting",
+        "bounded reversible retry",
+        "evaluate a guarded configuration transition"
+      ]
+    }
+  }
+}

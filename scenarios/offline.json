@@ -1,0 +1,54 @@
+{
+  "schema_version": "1.0",
+  "fixture_revision": "offline-v1",
+  "scenario_id": "OFFLINE",
+  "default_seed": 20261019,
+  "observable_initial_state": {
+    "schema_version": "1.0", "incident_id": "OFFLINE",
+    "observation_revision": 0, "country_code": "ZZ", "cohort_size": 1250,
+    "registration_status": "FAILED", "attach_success_rate": 0.0,
+    "telemetry_status": "MISSING", "telemetry_ack_rate": 0.0,
+    "active_profile_id": "profile_A", "alternative_profile_installed": true,
+    "allowed_alternative_operator_available": false,
+    "management_reachability": "UNREACHABLE", "ipa_available": true,
+    "eim_associated": true, "recent_firmware_change": false,
+    "connection_retry_count": 0, "transition_count": 0,
+    "action_counts": {
+      "retry_connection": 0, "try_allowed_operator": 0,
+      "investigate_device": 0, "investigate_data_path": 0,
+      "evaluate_profile_change": 0, "escalate_or_wait": 0
+    },
+    "evidence": ["NO_HEARTBEAT","ALT_PROFILE_INVENTORY_CONFIRMED","NO_ALLOWED_ALTERNATE_OPERATOR","MANAGEMENT_CHANNEL_UNREACHABLE"]
+  },
+  "policy_metadata": {
+    "owner_id": "synthetic-fleet-owner",
+    "profiles": [
+      {"profile_id":"profile_A","state":"ENABLED","owner_id":"synthetic-fleet-owner","allowed_operator_ids":["operator_remote_a"],"target_eligible":true,"risk_class":"LOW"},
+      {"profile_id":"profile_B","state":"INSTALLED_DISABLED","owner_id":"synthetic-fleet-owner","allowed_operator_ids":["operator_remote_b"],"target_eligible":true,"risk_class":"MEDIUM"}
+    ],
+    "operators": [
+      {"operator_id":"operator_remote_a","currently_selected":true,"permitted_on_active_profile":true,"available":false},
+      {"operator_id":"operator_remote_b","currently_selected":false,"permitted_on_active_profile":false,"available":false}
+    ],
+    "transition_supported": true, "ipa_available": true,
+    "eim_associated": true, "owner_authorized": true,
+    "management": {"kind":"NONE","reachable":false,"age_seconds":0,"max_age_seconds":0},
+    "max_transitions": 1, "in_flight_transition_id": null,
+    "used_transition_ids": [], "consumed_approval_ids": [],
+    "registration_threshold": 0.95, "telemetry_threshold": 0.95
+  },
+  "_evaluator_truth": {
+    "leakage_canary": "EVAL_ONLY_OFFLINE_4R8T6P",
+    "hidden_cause": "MANAGEMENT_PATH_ABSENT",
+    "acceptable_next_actions": ["investigate_device","investigate_data_path","escalate_or_wait"],
+    "effects": [
+      {"action":"retry_connection","occurrence":1,"evidence_added":["RETRY_1_COMMAND_PATH_UNAVAILABLE"],"registration_probability":0.0,"telemetry_probability":0.0,"delivery_outcome":"NOT_APPLICABLE","target_profile_id":null},
+      {"action":"retry_connection","occurrence":2,"evidence_added":["RETRY_2_COMMAND_PATH_UNAVAILABLE"],"registration_probability":0.0,"telemetry_probability":0.0,"delivery_outcome":"NOT_APPLICABLE","target_profile_id":null},
+      {"action":"try_allowed_operator","occurrence":1,"evidence_added":["OPERATOR_RESELECTION_UNAVAILABLE"],"registration_probability":0.0,"telemetry_probability":0.0,"delivery_outcome":"NOT_APPLICABLE","target_profile_id":null},
+      {"action":"investigate_device","occurrence":1,"evidence_added":["CACHED_MODEM_DIAGNOSTICS_UNAVAILABLE"],"registration_probability":null,"telemetry_probability":null,"delivery_outcome":"NOT_APPLICABLE","target_profile_id":null},
+      {"action":"investigate_data_path","occurrence":1,"evidence_added":["CACHED_APP_DIAGNOSTICS_UNAVAILABLE"],"registration_probability":null,"telemetry_probability":null,"delivery_outcome":"NOT_APPLICABLE","target_profile_id":null},
+      {"action":"evaluate_profile_change","occurrence":1,"evidence_added":["REMOTE_COMMAND_PATH_UNAVAILABLE"],"registration_probability":0.0,"telemetry_probability":0.0,"delivery_outcome":"TIMEOUT","target_profile_id":"profile_B"},
+      {"action":"escalate_or_wait","occurrence":1,"evidence_added":["AUTOMATION_ESCALATED"],"registration_probability":null,"telemetry_probability":null,"delivery_outcome":"NOT_APPLICABLE","target_profile_id":null}
+    ]
+  }
+}

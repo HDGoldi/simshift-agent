@@ -1,0 +1,32 @@
+{
+  "project_type": "Greenfield Python 3.11 CLI and reusable top-level Python pattern package; no UI, API server, database, or application container in Phase 1",
+  "language": "Python 3.11 plus small POSIX shell launch/evidence scripts and Markdown/JSON fixtures",
+  "build_system": "uv 0.12.18 with a pyproject.toml src layout and generated uv.lock; exact direct pins are pydantic 2.14.1, strands-agents 1.61.1, pytest 9.1.1, ruff 0.17.1, and mypy 2.4.0",
+  "test_framework": "pytest 9.1.1 with default offline tests and opt-in real_decider, production_path, and aws_integration markers",
+  "build_command": "uv sync --frozen --extra dev",
+  "test_command": "uv run pytest -q; then uv run pytest -q patterns/capability_aware_router/tests; opt-in real tests only with their explicit environment variables",
+  "verification_instructions": "Run uv sync --frozen --extra dev; validate both fixtures through python -m simshift.cli validate-fixtures; run all default pytest tests, standalone pattern tests, ruff, mypy, license-header validation, and bash -n. Real Decider tests must either run against the pinned local service/model or skip with an actionable opt-in message; once opted in, configuration/dependency failures fail. AWS integration never provisions and remains skipped without explicit credentials/authorization.",
+  "snapshot_or_generated_files": "uv.lock is generated and retained. Optional local evidence is written under /projects/sandbox/simshift-agent/.agents/evidence/vertical-slice/ and must be generated only by a real Decider run; final command evidence is written to /projects/sandbox/simshift-agent/.agents/tasks/final-evidence.md and verification-results.json. Never fabricate missing traces.",
+  "environment_constraints": "Amazon Linux x86_64, CPython 3.11.15, uv 0.12.18, 8 CPUs/30 GiB RAM, no AWS credentials, no usable container runtime, no ShellCheck, and no Git repository. A preserved Decider CPU runtime/model/cache exists under /projects/sandbox/simshift-agent/.agents/evidence/decider but no trusted local manifest exists yet. No Git initialization/commit/push/PR, cloud mutation/deployment, publication, article, or video is allowed.",
+  "contribution_requirements": "There is no project README, AGENTS.md, CONTRIBUTING.md, dependency manifest, source, or tests yet; only design/research artifacts exist. New work is Apache-2.0. Telecom data and behavior must be synthetic, Decider must causally choose the registered Strands tool, Bedrock must not select or authorize tools, and claims must distinguish REAL, LOCAL_TEST_DOUBLE, SIMULATED, OBSERVED, and UNVERIFIED.",
+  "key_patterns": "Capability-filter six stable action labels before one typed Decider choice; validate returned probabilities/confidence; preserve model_choice separately from low-confidence effective_choice; call an exact allowlisted agent.tool method; profile evaluation only prepares a proposal; pure gates plus lock/recheck atomically commit an approved virtual transition; registration and telemetry checks are independent; terminal gate denial emits proposal_blocked then PROFILE_PROPOSAL_BLOCKED escalation and stops. The portable pattern imports no simshift code.",
+  "relevant_files": [
+    "/projects/sandbox/SIMShift_Project_Handoff.md",
+    "/projects/sandbox/SIMShift_Hackathon_Requirements_and_Rules.md",
+    "/projects/sandbox/simshift-agent/.agents/tasks/environment.md",
+    "/projects/sandbox/simshift-agent/.agents/tasks/decider-research.md",
+    "/projects/sandbox/simshift-agent/.agents/tasks/strands-aws-research.md",
+    "/projects/sandbox/simshift-agent/.agents/tasks/requirements.md",
+    "/projects/sandbox/simshift-agent/.agents/tasks/design.md",
+    "/projects/sandbox/simshift-agent/.agents/tasks/design-review.md",
+    "/projects/sandbox/simshift-agent/.agents/tasks/design-verdict.json",
+    "/projects/sandbox/simshift-agent/.agents/tasks/plan.md",
+    "/projects/sandbox/simshift-agent/docs/architecture.md",
+    "/projects/sandbox/simshift-agent/docs/aws-deployment.md",
+    "/projects/sandbox/simshift-agent/docs/decider-api.md",
+    "/projects/sandbox/simshift-agent/docs/simulation-scope.md",
+    "/projects/sandbox/simshift-agent/.agents/evidence/decider/smoke-health.json",
+    "/projects/sandbox/simshift-agent/.agents/evidence/decider/model-v1-216d1ccb/provenance.json"
+  ],
+  "directory_structure": "At planning time the project contains only .agents/tasks research/design artifacts, .agents/evidence/decider preserved source/model/runtime evidence, and four docs files. Implementation creates pyproject/uv.lock, src/simshift for domain/integrations/orchestration/policy/simulator/tracing, scenarios for two strict fixtures, patterns/capability_aware_router for the independent recipe, tests/unit and tests/integration, scripts for local launch/evidence/validation, and docs/infra backlog updates."
+}

@@ -1,137 +1,57 @@
-# SIMShift: When Not to Switch
+# SIMShift Agent
 
-**When IoT devices lose connectivity, the wrong recovery action can be worse than doing nothing.**
+SIMShift is a Python 3.11 local-first vertical slice for capability-aware recovery routing. It combines a strict loopback Decider client, direct calls to six Strands-registered tools, deterministic synthetic telecom effects, guarded virtual profile transitions, and validated JSONL traces. The reusable domain-independent router is documented in [`patterns/capability_aware_router/README.md`](patterns/capability_aware_router/README.md).
 
-SIMShift is an IoT connectivity recovery agent. At every step, **Strands Decider 2B** chooses the next investigation
-or recovery tool. **Strands Agents** executes exactly that tool, and **Amazon Bedrock** reviews profile-change plans
-and explains the outcome. The agent works on a deterministic digital twin of a cellular IoT fleet with virtual eSIM
-profiles. A hard policy decides what is admissible, so no model can switch a profile on its own authority.
+## Evidence labels
 
-`#strands-decider-2b` `#tool-selection` · Submission for the AWS Builder Center *Agent Experience Hackathon: Strands Decider*
+- **REAL:** the retained loopback Decider run and direct Strands framework dispatch recorded under `.agents/evidence/vertical-slice/`.
+- **LOCAL_TEST_DOUBLE:** the inert Strands tool-host model and default deterministic explainer; the host model is never invoked.
+- **SIMULATED:** all telecom state, approvals, transitions, registration, telemetry, and outcomes.
+- **OBSERVED:** the retained local Decider model, source, runtime lock, verified file manifest, provenance, and lossless hash-validated wire bodies under `.agents/evidence/decider` and `.agents/evidence/vertical-slice`. Retained base-model bytes are hash/Merkle verified, but their repository revision is explicitly inferred rather than independently proven.
+- **UNVERIFIED:** AWS deployment, Bedrock account/model access, GPU behavior, cloud performance, and cost.
 
-> **Simulation disclosure.** The fleet, operators, eSIM profiles, eIM/IPA and every number in device state are
-> synthetic. No carrier, eUICC, SM-DP+ or GSMA SGP.32 operation is performed or claimed. The Decider and Bedrock
-> calls are real.
+No real carrier, subscriber, modem, eUICC, SM-DP+, or cloud resource is contacted by default.
 
-## Reusable Decider decision pattern
+## Local development
 
-**[`patterns/capability_aware_router/`](patterns/capability_aware_router/README.md)** is the reusable recipe:
-**CapabilityAwareRouter**, a tool-selection pattern with no telecom code. Its README covers the typed question format,
-the routing rule, the wiring and usage, and it ships with its own tests and a non-telecom example. The core is one
-file, [`router.py`](patterns/capability_aware_router/router.py).
-
-```
-state ─► policy removes inadmissible options (with reasons) ─► Decider `choice` over the rest
-      ─► confidence ≥ 0.5: act │ else: most probable read-only tool │ else: fallback
-         (an answer outside the offered options, or no answer at all, also goes to the fallback)
-      ─► agent.tool.<selected>()  ─► same policy re-checked by a Strands InterventionHandler
+```sh
+uv sync --frozen --extra dev
+uv run python -m simshift.cli validate-fixtures
+uv run pytest -q
+uv run pytest -q patterns/capability_aware_router/tests
+uv run ruff check .
+uv run mypy src patterns/capability_aware_router
+uv run python scripts/check_license_headers.py
+bash -n scripts/*.sh
 ```
 
-## The decision Decider makes
+The normal suite is offline. Opt-in tests skip with exact environment setup instructions.
 
-SIMShift's typed question, asked at every step ([`simshift/agent.py`](simshift/agent.py)):
+## Real local Decider (opt-in)
 
-> *Given the cellular connectivity symptoms, diagnostic evidence so far, and only these admissible tools, which next
-> tool is most useful for safely advancing service restoration? Do not assume an unverified recovery path works.*
+The retained `decider-manifest.json` is the local trust anchor. Before any network call the adapter verifies its exact `files.manifest.json` hash, every listed regular-file size/hash, logical source/adapter/base Merkle roots, runtime lock, and model provenance bindings. Start the already-downloaded runtime in the foreground:
 
-The option set has six options, each mapped 1:1 to a registered Strands tool (descriptions in [`simshift/policy.py`](simshift/policy.py)):
-
-| Option | Strands tool | Kind |
-|---|---|---|
-| `retry_connection` | `simulate_retry_with_backoff` | bounded, network-side |
-| `try_allowed_operator` | `simulate_operator_reselection` | another operator **on the active profile** |
-| `investigate_device` | `query_firmware_modem_diagnostics` | read-only |
-| `investigate_data_path` | `query_apn_session_app_diagnostics` | read-only |
-| `evaluate_profile_change` | `prepare_guarded_profile_transition` | advisory Bedrock plan review, then hard gate + human approval, then virtual eIM |
-| `escalate_or_wait` | `defer_or_escalate` | fallback |
-
-Before Decider sees the options, the policy removes inadmissible ones. A profile change is never offered:
-- while another operator on the active profile is available;
-- without a management path to the device;
-- while the active profile registers normally;
-- before modem diagnostics show a registration reject cause.
-
-The same rules run again at the gate, together with owner authorization and human approval. Details:
-[docs/architecture.md](docs/architecture.md).
-
-## Observed runs (real Decider + Bedrock, synthetic fleet)
-
-| Scenario | What the agent did | Outcome |
-|---|---|---|
-| `BR_PROFILE` | Decider leans to `retry_connection` at conf 0.04, then 0.20, so the router runs the most probable read-only diagnostics instead. Modem shows reject #17. Decider picks `evaluate_profile_change` (conf 0.81). Bedrock review recommends proceeding as a staged change (advisory; the gate does not read it), gate + approval pass, virtual eIM enables profile_B | registration **and** app telemetry restored |
-| `OFFLINE` | device diagnostics and profile change excluded (no management path), reselection excluded (no allowed operator in coverage) → network-side check (conf 0.06, read-only) → escalate (conf 0.31, fallback) | no OTA change attempted |
-| `JP_INGEST` | retry and profile change excluded (registration healthy), reselection excluded (no allowed operator in coverage) → Decider picks `investigate_data_path` (conf 0.71) → ingestion regression found → modem check (conf 0.09, read-only) → escalate (only option left, no model call) | no network change; root cause handed off |
-| `DE_OPERATOR` | management rides on the failing cellular link, so device diagnostics and profile change are excluded → Decider leans to `try_allowed_operator` at conf 0.47, so the router runs the read-only network-side check → Decider picks `try_allowed_operator` (conf 0.62) | recovered without touching the eSIM |
-
-These are single runs on 2026-10-18, not a benchmark. Full traces are in [docs/sample-runs/](docs/sample-runs/).
-Per-step numbers, latencies and the known Decider misses are in [docs/measurements.md](docs/measurements.md).
-
-## Run it
-
-```bash
-# 1. Decider server (pinned: strands-labs/strands-decider @ 930e6d5d)
-git clone https://github.com/strands-labs/strands-decider && cd strands-decider && git checkout 930e6d5d
-uv venv && uv pip install -e ".[mlx]"        # Apple silicon; elsewhere: uv pip install -e . and use --device cpu
-.venv/bin/strands-decider serve StrandsAgents/strands-decider-2B-qwen3.5-v1-2610 --device mlx --port 8099
-
-# 2. Agent: second terminal (the server stays in the foreground). Needs AWS credentials with Bedrock access.
-git clone https://github.com/HDGoldi/simshift-agent && cd simshift-agent
-uv venv && uv pip install -e . pytest
-AWS_PROFILE=<your-profile> .venv/bin/python -m simshift.agent BR_PROFILE --approve --out runs/br.json
-.venv/bin/python -m simshift.agent OFFLINE --no-bedrock
+```sh
+STRANDS_DECIDER_MODEL_DIR="$PWD/.agents/evidence/decider/model-v1-216d1ccb" \
+STRANDS_DECIDER_PYTHON="$PWD/.agents/evidence/decider/runtime/venv/bin/python" \
+HF_HOME="$PWD/.agents/evidence/decider/hf-cache" \
+scripts/run-local-decider.sh
 ```
 
-No GPU and no AWS account? Replay a recorded run. The agent re-runs the real routing, policy and twin code against
-the Decider answers stored in a published trace, and stops if any question differs from the one recorded:
+The launcher forces Hugging Face/Transformers offline mode and downloads nothing. In another terminal, run:
 
-```bash
-.venv/bin/python -m simshift.agent BR_PROFILE --approve --no-bedrock --replay docs/sample-runs/BR_PROFILE.json
+```sh
+export STRANDS_DECIDER_URL=http://127.0.0.1:8099
+export STRANDS_DECIDER_MANIFEST="$PWD/.agents/evidence/decider/decider-manifest.json"
+SIMSHIFT_RUN_REAL_DECIDER=1 uv run pytest -q -m real_decider
+SIMSHIFT_RUN_PRODUCTION_PATH=1 uv run pytest -q -m production_path
+scripts/capture-local-evidence.sh
 ```
 
-Settings: `DECIDER_URL` (default `http://127.0.0.1:8099`), `SIMSHIFT_BEDROCK_MODEL` (default
-`eu.anthropic.claude-haiku-5-5`), `AWS_REGION` (default `eu-central-1`). `--approve` is the human operator's
-pre-approval for a profile switch. Without it, the gate stops at `human_approval`.
+Once an opt-in is enabled, missing or mismatched configuration is a failure, not a skip. Evidence capture writes only results produced by the real endpoint and validates them; it never substitutes a fake.
 
-## Tests
+## AWS status
 
-`.venv/bin/pytest -q` runs 37 tests. They need no AWS credentials, and the real-Decider test skips when no server
-is running. The acceptance properties covered:
-- Decider's choice controls which Strands tool runs.
-- Excluded options are never offered and are denied on any call path.
-- Unreachable devices never get an OTA change.
-- A profile change needs approval, and the virtual eIM refuses an unapproved enable even when called directly.
-- Brazil restores both registration and telemetry.
-- No hidden truth reaches Decider or Bedrock prompts.
-- The twin is deterministic: replaying the same actions gives identical state and events.
-- The step limit escalates.
-- A Decider outage, a malformed answer, or an answer outside the offered options fails closed.
-- Each published trace in `docs/sample-runs/` replays through the current code to the same tools and outcome.
+AWS/Bedrock is optional, already-deployed-only, and **UNVERIFIED**. `SIMSHIFT_RUN_AWS_INTEGRATION=1` never provisions resources. Phase 2 hardening is tracked in [`infra/ec2/implementation-backlog.md`](infra/ec2/implementation-backlog.md); it is not a Phase 1 prerequisite.
 
-## Repository layout
-
-```
-patterns/capability_aware_router/   reusable Decider pattern (router, README, example, tests)
-simshift/agent.py                   Strands agent: loop, tools, Bedrock plan + explanation, CLI
-simshift/policy.py                  option descriptions, exclusions, profile-transition gate
-simshift/simulator.py               deterministic fleet twin + virtual eIM/IPA/eUICC, 4 scenarios
-tests/                              agent, twin and policy tests
-docs/                               architecture, measurements, submission checklist, sample traces
-spikes/decider_spike.py             standalone Decider API probe used to validate the API
-```
-
-## Status and next steps
-
-Done: a working vertical slice, run locally (Decider on MLX, Bedrock in eu-central-1).
-
-Next:
-- AWS hosting: agent on Bedrock AgentCore Runtime, Decider on an ECS Fargate CPU container.
-- A decision-trace UI.
-- Firmware-loop and transient-disruption scenarios.
-- Rules-only vs Bedrock-only vs Decider+Bedrock comparison on held-out cases.
-
-Submission status: [docs/hackathon-submission.md](docs/hackathon-submission.md).
-
-## License
-
-[Apache-2.0](LICENSE). The code uses, but does not redistribute, Strands Decider (Apache-2.0), its Qwen3.5-2B base
-model (Apache-2.0) and Strands Agents (Apache-2.0). Amazon Bedrock models are subject to their own service terms.
+This project is licensed under Apache-2.0.

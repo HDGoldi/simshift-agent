@@ -1,0 +1,1 @@
+{"approval_consumed": false, "command_created": false, "final_profile": "profile_A", "initial_profile": "profile_A", "profile_unchanged": true, "reason": "MANAGEMENT_UNREACHABLE", "reasons": ["MANAGEMENT_UNREACHABLE"], "state_unchanged": true, "status": "BLOCKED", "transition_id": null}

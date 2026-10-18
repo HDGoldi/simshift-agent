@@ -1,0 +1,55 @@
+{
+  "verdict": "CHANGES_REQUESTED",
+  "findings": [
+    {
+      "id": 1,
+      "severity": "HIGH",
+      "location": "docs/aws-deployment.md offline bundle/services; docs/decider-api.md manifest; design.md AWS deployment artifacts",
+      "problem": "The no-Internet bundle puts the base model under a logical models/base path, but the pinned upstream loader calls Transformers from_pretrained with the remote Qwen repository ID and revision. No local cache layout, base-path override, HF_HOME, or offline-mode configuration is defined, so the sole AWS path can attempt Hugging Face access and fail.",
+      "fix": "Package the complete pinned base in the exact Hugging Face cache layout, set HF_HOME plus HF_HUB_OFFLINE=1 and TRANSFORMERS_OFFLINE=1 in the service, enumerate all required files, and add a network-disabled service-start/health acceptance test that fails on any Hub request."
+    },
+    {
+      "id": 2,
+      "severity": "HIGH",
+      "location": "docs/aws-deployment.md reviewable files, offline bundle, and bootstrap preflight",
+      "problem": "bootstrap-host.sh is expected to fetch and extract the bundle while also being contained in that bundle, and the design does not define how stage zero reaches the instance or which download, verification, decompression, Python, SSM, and CUDA prerequisites the no-NAT AMI must already provide.",
+      "fix": "Embed a reviewed minimal stage-zero script in CloudFormation UserData or pin a pre-baked AMI, define and preflight the complete AMI contract, then have stage zero fetch and verify the exact object before running bundled stage one. Test this on a clean instance."
+    },
+    {
+      "id": 3,
+      "severity": "MEDIUM",
+      "location": "docs/aws-deployment.md CloudFormation role and endpoint/bootstrap preflight",
+      "problem": "Mandatory on-host checks inspect route tables, VPC endpoints, security groups, and interfaces, but the listed instance role grants no EC2 describe APIs, so the required fatal checks cannot be implemented under the stated permissions.",
+      "fix": "Add the minimum read-only EC2 describe actions and document each use, or move those inspections to the operator preflight and pass versioned evidence to bootstrap. Keep mutation actions denied and assign one owner for each check."
+    },
+    {
+      "id": 4,
+      "severity": "MEDIUM",
+      "location": "design.md orchestration/error behavior; docs/simulation-scope.md filtering and fixture effects",
+      "problem": "Final gate denial is not declared terminal, profile evaluation is not filtered after occurrence 1, and fixtures define no occurrence-2 profile effect. A denied Brazil run can therefore loop, select profile evaluation again, and reach undefined deterministic behavior with a new proposal ID.",
+      "fix": "Declare every final gate denial terminal for this slice by emitting proposal_blocked followed by run_escalated(PROFILE_PROPOSAL_BLOCKED), with no further decision. Test one proposal, one audit, zero transitions, unchanged profile, and no second model/tool call."
+    },
+    {
+      "id": 5,
+      "severity": "MEDIUM",
+      "location": "docs/decider-api.md exact request/integration contract; design.md production-path test; docs/simulation-scope.md OFFLINE flow",
+      "problem": "The required real OFFLINE characterization has no complete normative request sequence. The design defines one exact Brazil payload but not a canonical six-action description registry or golden OFFLINE requests after each diagnostic, even though wording and option order can change model routing.",
+      "fix": "Define one ordered Action-to-QuestionOption registry and deterministic request builder for every iteration, include golden OFFLINE requests for revision 0 and reachable post-diagnostic states, run them against the pin, and assert the explicitly characterized bounded safe-escalation path."
+    },
+    {
+      "id": 6,
+      "severity": "MEDIUM",
+      "location": "requirements.md FR12; design.md dispatch/trace; docs/architecture.md run_started statuses",
+      "problem": "Local runs use an inert LocalTestDoubleModel to back the Strands tool-host Agent, but the mandatory trace statuses omit the tool-host model while labeling Strands dispatch REAL. This contradicts the promise that doubles are independently disclosed.",
+      "fix": "Trace strands_framework_dispatch, strands_tool_host_model, and explainer_model separately, including real provider/model identifiers where applicable, and test that the host model is labeled even though its invocation count remains zero."
+    },
+    {
+      "id": 7,
+      "severity": "MEDIUM",
+      "location": "requirements.md FR15-FR16/AC16-AC18; design.md locked stack/AWS artifacts/tests; docs/aws-deployment.md",
+      "problem": "The first-slice critical path includes Merkle/archive supply-chain machinery, a no-NAT private endpoint topology, custom validators, CPU/CUDA wheelhouses, and broad infrastructure acceptance before any production code exists. This is scope creep relative to the authoritative priority of producing the first functioning, testable agent and increases the risk of delivering scaffolding instead of a runnable path.",
+      "fix": "Phase the plan: first complete the local real-Decider BR/OFFLINE CLI and safety tests; next prove the same path on one minimal EC2+Bedrock deployment; only then add no-NAT offline-bundle hardening. Make the hardening conditional on choosing that topology rather than a prerequisite for the first runnable artifact."
+    }
+  ],
+  "reviewDoc": "/projects/sandbox/simshift-agent/.agents/tasks/design-review.md"
+}

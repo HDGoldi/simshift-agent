@@ -1,0 +1,12 @@
+{
+  "base_model": "Qwen/Qwen3.5-2B-Base",
+  "checkpoint": "/projects/sandbox/simshift-agent/.agents/evidence/decider/model-v1-216d1ccb",
+  "device": "cpu",
+  "max_length": 4096,
+  "model": "model-v1-216d1ccb",
+  "num_slots": 24,
+  "prefix_cache": true,
+  "status": "ok",
+  "temperature": 1.0545210242263665,
+  "vision": false
+}

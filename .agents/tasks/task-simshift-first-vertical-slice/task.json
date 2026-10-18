@@ -1,0 +1,7 @@
+{
+  "task_id": "task-simshift-first-vertical-slice",
+  "task_description": "Implement the first runnable local SIMShift BR_PROFILE and OFFLINE vertical slice with real Decider-to-Strands routing, deterministic simulated safety/recovery, a standalone reusable router, honest opt-in integrations, documentation, and evidence; defer AWS deployment hardening.",
+  "status": "pending",
+  "feature_order": ["FEAT-001", "FEAT-002", "FEAT-003", "FEAT-004"],
+  "blocked_reason": null
+}

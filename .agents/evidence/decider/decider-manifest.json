@@ -1,0 +1,78 @@
+{
+  "schema_version": "1.1",
+  "source": {
+    "repository": "https://github.com/strands-labs/strands-decider",
+    "commit": "930e6d5de16309be32579f5631a7369a3322140c"
+  },
+  "checkpoint": {
+    "repository": "StrandsAgents/strands-decider-2B-qwen3.5-v1-2610",
+    "commit": "216d1ccb46a9e9b036eb9187b248db98480f77d4"
+  },
+  "base": {
+    "repository": "Qwen/Qwen3.5-2B-Base",
+    "commit": "b1485b2fa6dfa1287294f269f5fb618e03d52d7c"
+  },
+  "expected_health": {
+    "model": "model-v1-216d1ccb",
+    "checkpoint": "/projects/sandbox/simshift-agent/.agents/evidence/decider/model-v1-216d1ccb",
+    "base_model": "Qwen/Qwen3.5-2B-Base",
+    "device": "cpu",
+    "max_length": 4096,
+    "num_slots": 24,
+    "vision": false
+  },
+  "file_manifest_path": "files.manifest.json",
+  "file_manifest_sha256": "1814b697efce120356087f7a2f4d313d715b1c2b9f03f66f7884cf91b82a5a10",
+  "provenance_path": "model-v1-216d1ccb/provenance.json",
+  "logical_artifacts": [
+    {
+      "logical_name": "source_snapshot",
+      "paths": [
+        "repo/src/strands_decider/__init__.py",
+        "repo/src/strands_decider/cli.py",
+        "repo/src/strands_decider/cpu_kernels.py",
+        "repo/src/strands_decider/hf_export.py",
+        "repo/src/strands_decider/infer.py",
+        "repo/src/strands_decider/mlx_engine.py",
+        "repo/src/strands_decider/modeling.py",
+        "repo/src/strands_decider/mps_kernels.py",
+        "repo/src/strands_decider/naming.py",
+        "repo/src/strands_decider/prompting.py",
+        "repo/src/strands_decider/schema.py",
+        "repo/src/strands_decider/server.py",
+        "repo/src/strands_decider/vision.py"
+      ],
+      "merkle_root": "fe46eb298a56d181af394ec8bc212d2c46a4d6dcb4a9de9201f7aeb7c162070d"
+    },
+    {
+      "logical_name": "adapter_snapshot",
+      "paths": [
+        "model-v1-216d1ccb/head.safetensors",
+        "model-v1-216d1ccb/lora/adapter_config.json",
+        "model-v1-216d1ccb/lora/adapter_model.safetensors",
+        "model-v1-216d1ccb/strands_decider_config.json",
+        "model-v1-216d1ccb/tokenizer.json",
+        "model-v1-216d1ccb/tokenizer_config.json",
+        "model-v1-216d1ccb/train_config.json"
+      ],
+      "merkle_root": "4d558fdf6e0d27d062d3459ceb8a7e5f3944e66a1fdf6e35ab477e2d31976b91"
+    },
+    {
+      "logical_name": "base_snapshot",
+      "paths": [
+        "hf-cache/hub/models--Qwen--Qwen3.5-2B-Base/blobs/10fd4fbf87dc5e198b28d9e0598c70a9780b72c1",
+        "hf-cache/hub/models--Qwen--Qwen3.5-2B-Base/blobs/928acbf11878c32185bbd863514d191769285065ab9ea14fbfe431303f5fdf2d",
+        "hf-cache/hub/models--Qwen--Qwen3.5-2B-Base/blobs/d30a15be1bbfd610f58ad80f1fbeb6778f58a80f"
+      ],
+      "merkle_root": "f1b03a5178890fd57c9062d072a6ab43b9e2d10cb40ea05d0b7d8725c7d2353e"
+    },
+    {
+      "logical_name": "model_provenance",
+      "paths": ["model-v1-216d1ccb/provenance.json"]
+    },
+    {
+      "logical_name": "dependency_lock",
+      "paths": ["runtime/requirements.lock"]
+    }
+  ]
+}

@@ -1,0 +1,2 @@
+# Reserved for the separately validated Linux CUDA Decider runtime constraints.
+# CUDA compatibility is not claimed by the Phase 1 local slice.

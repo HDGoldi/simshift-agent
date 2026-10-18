@@ -1,150 +1,121 @@
-"""Pattern tests. No model download, no AWS: a fake Decider stands in for the HTTP client."""
-from strands import Agent, tool
-from strands.hooks import BeforeToolCallEvent
-from strands.models import BedrockModel
+# Copyright 2026 SIMShift contributors
+# SPDX-License-Identifier: Apache-2.0
 
-from patterns.capability_aware_router.router import CapabilityAwareRouter
+from collections import Counter
+from collections.abc import Callable
 
+import pytest
 
-class FakeDecider:
-    def __init__(self, choice, probs=None, confidence=0.9):
-        self.choice, self.probs, self.confidence, self.calls = choice, probs, confidence, []
-
-    def choose(self, state, instructions, options, name="next_tool"):
-        self.calls.append({"state": state, "options": dict(options)})
-        probs = self.probs or {o: (1.0 if o == self.choice else 0.0) for o in options}
-        return {"choice": self.choice, "probabilities": probs, "confidence": self.confidence}
-
-
-ran = []
+from patterns.capability_aware_router.router import CapabilityAwareRouter, ToolRegistry
+from patterns.capability_aware_router.schemas import (
+    ChoiceDecision,
+    DecisionPolicy,
+    FilterResult,
+    QuestionOption,
+    TypedChoiceQuestion,
+    Usage,
+)
 
 
-@tool
-def do_a() -> str:
-    """Tool A."""
-    ran.append("do_a"); return "a"
+class RecordingClient:
+    def __init__(self, selected_index: int = 0) -> None:
+        self.calls = 0
+        self.selected_index = selected_index
+
+    def choose(
+        self,
+        *,
+        state: object,
+        question: TypedChoiceQuestion,
+        expected_model: str,
+    ) -> ChoiceDecision:
+        self.calls += 1
+        selected = question.options[self.selected_index].label
+        probabilities = {option.label: 0.0 for option in question.options}
+        probabilities[selected] = 1.0
+        return ChoiceDecision(
+            model=expected_model,
+            model_choice=selected,
+            probabilities=probabilities,
+            confidence=1.0,
+            usage=Usage(input_tokens=1, output_tokens=1),
+            client_latency_ms=1.0,
+        )
 
 
-@tool
-def do_b() -> str:
-    """Tool B."""
-    ran.append("do_b"); return "b"
+def _record(calls: Counter[str], label: str) -> Callable[[], str]:
+    def callback() -> str:
+        calls.update([label])
+        return label
+
+    return callback
 
 
-@tool
-def look() -> str:
-    """Read-only tool."""
-    ran.append("look"); return "seen"
+def _options(count: int) -> tuple[QuestionOption, ...]:
+    return tuple(
+        QuestionOption(label=f"a{index}", description=f"Action {index}")
+        for index in range(count)
+    )
 
 
-@tool
-def hold() -> str:
-    """Fallback."""
-    ran.append("hold"); return "held"
+@pytest.mark.parametrize(
+    ("count", "expected_reason", "expected_http"),
+    [
+        (0, "INSUFFICIENT_CHOICE_CARDINALITY", 0),
+        (1, "INSUFFICIENT_CHOICE_CARDINALITY", 0),
+        (2, None, 1),
+        (24, None, 1),
+        (25, "UNSUPPORTED_CHOICE_CARDINALITY", 0),
+        (255, "UNSUPPORTED_CHOICE_CARDINALITY", 0),
+    ],
+)
+def test_capacity_boundaries_do_not_reduce_or_fabricate_options(
+    count: int, expected_reason: str | None, expected_http: int
+) -> None:
+    options = _options(count)
+    filtered = FilterResult.from_partition(options, eligible=options, removed=())
+    client = RecordingClient()
+    callbacks: Counter[str] = Counter()
+    registered = _options(max(count, 1))
+    registry = ToolRegistry(
+        {option.label: _record(callbacks, option.label) for option in registered}
+    )
+    router = CapabilityAwareRouter(
+        client=client,
+        trusted_num_slots=24,
+        expected_model="model-v1",
+        registry=registry,
+        policy=DecisionPolicy(min_confidence=0.20, fallback_label=registered[0].label),
+    )
+    result = router.route_filtered(
+        filtered=filtered,
+        state={},
+        question_name="next_step",
+        instructions="Choose one action.",
+    )
+    assert client.calls == expected_http
+    assert sum(callbacks.values()) == expected_http
+    assert len(filtered.eligible) == count
+    assert (result.no_decision.reason if result.no_decision else None) == expected_reason
 
 
-OPTIONS = {"a": "do A", "b": "do B", "look": "inspect", "hold": "hand off"}
-TOOLS = {"a": "do_a", "b": "do_b", "look": "look", "hold": "hold"}
-
-
-def setup(decider, policy=lambda s: {}):
-    r = CapabilityAwareRouter(decider=decider, instructions="next?", options=OPTIONS, tools=TOOLS,
-                              policy=policy, fallback="hold", read_only=frozenset({"look"}))
-    agent = Agent(model=BedrockModel(model_id="unused", region_name="us-east-1"),
-                  tools=[do_a, do_b, look, hold], interventions=[r.gate(lambda: {})], callback_handler=None)
-    seen = []
-    agent.add_hook(lambda e: seen.append(e.tool_use["name"]), BeforeToolCallEvent)
-    ran.clear()
-    return r, agent, seen
-
-
-def test_tool_routing_follows_decider_choice():
-    for choice, tool_name in (("a", "do_a"), ("b", "do_b")):
-        r, agent, seen = setup(FakeDecider(choice))
-        d, res = r.step(agent, {"x": 1})
-        assert d.route == "act" and seen == ran == [tool_name] and res["status"] == "success"
-
-
-def test_capability_filter_never_offers_excluded_option():
-    dec = FakeDecider("a")
-    r, agent, _ = setup(dec, policy=lambda s: {"b": "not allowed here"})
-    d = r.decide({})
-    assert "b" not in dec.calls[0]["options"] and d.excluded == {"b": "not allowed here"}
-
-
-def test_low_confidence_gathers_evidence_then_falls_back():
-    r, _, _ = setup(FakeDecider("a", {"a": 0.4, "b": 0.3, "look": 0.2, "hold": 0.1}, confidence=0.2))
-    assert r.decide({}).selected == "look"
-    r, _, _ = setup(FakeDecider("a", {"a": 0.5, "b": 0.3, "hold": 0.2}, confidence=0.2),
-                    policy=lambda s: {"look": "already done"})
-    d = r.decide({})
-    assert (d.selected, d.route) == ("hold", "fallback")
-
-
-def test_forbidden_action_denied_even_on_direct_call():
-    r = CapabilityAwareRouter(decider=FakeDecider("a"), instructions="?", options=OPTIONS, tools=TOOLS,
-                              policy=lambda s: {"a": "forbidden"}, fallback="hold")
-    agent = Agent(model=BedrockModel(model_id="unused", region_name="us-east-1"), tools=[do_a, hold],
-                  interventions=[r.gate(lambda: {})], callback_handler=None)
-    ran.clear()
-    res = agent.tool.do_a()
-    assert res["status"] == "error" and "forbidden" in res["content"][0]["text"] and ran == []
-
-
-def test_only_fallback_admissible_skips_model_call():
-    dec = FakeDecider("a")
-    r, _, _ = setup(dec, policy=lambda s: {"a": "x", "b": "x", "look": "x"})
-    assert r.decide({}).selected == "hold" and dec.calls == []
-
-
-def test_decider_failure_fails_closed():
-    class Down:
-        def choose(self, *a, **k):
-            raise OSError("connection refused")
-    r, agent, seen = setup(Down())
-    d, res = r.step(agent, {})
-    assert (d.selected, d.route) == ("hold", "fallback") and seen == ["hold"] and "connection refused" in d.raw["error"]
-
-
-def test_non_admissible_choice_falls_back():
-    dec = FakeDecider("b", {"a": 0.5, "look": 0.3, "hold": 0.2}, confidence=0.95)  # answers outside the menu
-    r, agent, seen = setup(dec, policy=lambda s: {"b": "not allowed here"})
-    d, _ = r.step(agent, {})
-    assert (d.selected, d.route) == ("hold", "fallback") and seen == ["hold"] and "non-admissible" in d.reason
-
-
-def test_malformed_answer_fails_closed():
-    class Bad:
-        def choose(self, *a, **k):
-            return {"choice": "a", "probabilities": {}, "confidence": None}
-    r, agent, seen = setup(Bad())
-    d, _ = r.step(agent, {})
-    assert (d.selected, d.route) == ("hold", "fallback") and seen == ["hold"] and "malformed" in d.raw["error"]
-
-
-def test_replay_keeps_recorded_outages_in_order():
-    from patterns.capability_aware_router.router import ReplayDecider
-
-    class Flaky:
-        def __init__(self):
-            self.n = 0
-        def choose(self, state, instructions, options, name="next_tool"):
-            self.n += 1
-            if self.n == 1:
-                raise OSError("down")
-            return {"choice": "a", "probabilities": {o: float(o == "a") for o in options}, "confidence": 0.9}
-    recorder, _, _ = setup(Flaky())
-    rec = [vars(recorder.decide({"t": i})) for i in (1, 2)]
-    r, _, _ = setup(ReplayDecider(rec))
-    assert [r.decide({"t": i}).route for i in (1, 2)] == [d["route"] for d in rec] == ["fallback", "act"]
-
-
-def test_replay_refuses_a_different_question():
-    from patterns.capability_aware_router.router import ReplayDecider
-    recorder, _, _ = setup(FakeDecider("a"))
-    rec = recorder.decide({"x": 1})
-    r, _, _ = setup(ReplayDecider([vars(rec)]))
-    assert r.decide({"x": 2}).route == "fallback"  # state changed: recorded answer not applied
-    r, _, _ = setup(ReplayDecider([vars(rec)]))
-    d = r.decide({"x": 1})
-    assert (d.selected, d.route, d.raw["replayed"]) == ("a", "act", True)
+def test_selected_label_dispatches_exactly_one_matching_callback() -> None:
+    options = _options(3)
+    calls: Counter[str] = Counter()
+    router = CapabilityAwareRouter(
+        client=RecordingClient(selected_index=1),
+        trusted_num_slots=24,
+        expected_model="model-v1",
+        registry=ToolRegistry(
+            {option.label: _record(calls, option.label) for option in options}
+        ),
+        policy=DecisionPolicy(min_confidence=0.20, fallback_label="a2"),
+    )
+    result = router.route_filtered(
+        filtered=FilterResult.from_partition(options, eligible=options, removed=()),
+        state={},
+        question_name="next_step",
+        instructions="Choose one.",
+    )
+    assert calls == Counter({"a1": 1})
+    assert result.trace.dispatched_label == "a1"

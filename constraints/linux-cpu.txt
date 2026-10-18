@@ -1,0 +1,2 @@
+# Reserved for the hash-locked Linux CPU Decider runtime constraints.
+# Phase 1 application dependencies are locked in uv.lock.

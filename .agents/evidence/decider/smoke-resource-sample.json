@@ -1,0 +1,10 @@
+{
+  "status": 200,
+  "load_seconds": 13.738,
+  "wall_request_seconds": 3.035,
+  "reported_latency_ms": 3020.07,
+  "choice": "evaluate_profile_change",
+  "peak_rss_bytes_sampled": 12061945856,
+  "peak_rss_gib_sampled": 11.234,
+  "measurement_note": "Peak RSS was sampled every 20 ms with psutil in the same process; this is not a kernel high-water mark. The model/base artifacts were already cached."
+}

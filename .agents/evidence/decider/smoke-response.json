@@ -1,0 +1,40 @@
+{
+  "answers": {
+    "evidence_sufficient": {
+      "noul": 0.6203,
+      "type": "noul"
+    },
+    "intervention_level": {
+      "confidence": 0.3033,
+      "legend": {
+        "0": "read-only investigation or waiting",
+        "1": "bounded reversible retry",
+        "2": "evaluate a guarded configuration transition"
+      },
+      "probabilities": {
+        "0": 0.3033,
+        "1": 0.3713,
+        "2": 0.3255
+      },
+      "score": 1.0222,
+      "type": "score"
+    },
+    "next_recovery_step": {
+      "choice": "evaluate_profile_change",
+      "confidence": 0.3122,
+      "probabilities": {
+        "escalate_or_wait": 0.1337,
+        "evaluate_profile_change": 0.4841,
+        "investigate_device": 0.0795,
+        "retry_connection": 0.3026
+      },
+      "type": "choice"
+    }
+  },
+  "latency_ms": 6755.44,
+  "model": "model-v1-216d1ccb",
+  "usage": {
+    "input_tokens": 354,
+    "output_tokens": 3
+  }
+}
