@@ -15,6 +15,7 @@ from dataclasses import asdict
 
 from pydantic import BaseModel
 from strands import Agent, tool
+from strands.hooks import AfterToolCallEvent, BeforeToolCallEvent
 from strands.models import BedrockModel
 
 from patterns.capability_aware_router.router import CapabilityAwareRouter, DeciderClient, ReplayDecider
@@ -89,10 +90,34 @@ def build_tools(twin: FleetTwin, approve: bool, llm: BedrockModel | None) -> lis
     @tool
     def defer_or_escalate() -> dict:
         """Hold external changes and hand off to a human with the collected evidence."""
+        twin.escalate()
         return {"escalated": True, "evidence": twin.observe()["diagnostics"]}
 
     return [simulate_retry_with_backoff, simulate_operator_reselection, query_firmware_modem_diagnostics,
             query_apn_session_app_diagnostics, prepare_guarded_profile_transition, defer_or_escalate]
+
+
+def watch_tool_calls(agent: Agent, twin: FleetTwin) -> list[dict]:
+    """Independent audit of every tool call: was its option excluded by policy in the state it ran in?
+    Recomputed from the policy function, so it still counts violations if the gate itself were broken."""
+    option_for, audit = {t: o for o, t in TOOLS.items()}, []
+
+    def before(e):
+        option = option_for.get(e.tool_use["name"])
+        audit.append({"tool": e.tool_use["name"], "id": e.tool_use["toolUseId"],
+                      "excluded": option != FALLBACK and exclusions(twin.observe()).get(option)})
+
+    def after(e):
+        next(a for a in reversed(audit) if a["id"] == e.tool_use["toolUseId"])["status"] = e.result["status"]
+
+    agent.add_hook(before, BeforeToolCallEvent)
+    agent.add_hook(after, AfterToolCallEvent)
+    return audit
+
+
+def audit_counts(audit: list[dict]) -> dict:
+    return {"forbidden_executions": sum(bool(a["excluded"]) and a.get("status") == "success" for a in audit),
+            "blocked_calls": sum(bool(a["excluded"]) and a.get("status") != "success" for a in audit)}
 
 
 def make_router(decider) -> CapabilityAwareRouter:
@@ -106,6 +131,7 @@ def run(scenario_id: str, approve: bool = False, decider=None, use_bedrock: bool
     llm = BedrockModel(model_id=BEDROCK_MODEL, region_name=REGION, max_tokens=2048)
     agent = Agent(model=llm, tools=build_tools(twin, approve, llm if use_bedrock else None),
                   interventions=[router.gate(twin.observe)], callback_handler=None)
+    audit = watch_tool_calls(agent, twin)
     initial, trace = twin.rates(), []
     for step in range(1, MAX_STEPS + 1):
         decision, result = router.step(agent, twin.observe())
@@ -122,7 +148,8 @@ def run(scenario_id: str, approve: bool = False, decider=None, use_bedrock: bool
                       "note": f"step limit {MAX_STEPS} reached"})
     outcome = {"restored": twin.service_restored(), "initial_rates": initial, "final_rates": twin.rates(),
                "active_profile": twin.s["active_profile"], "serving_operator": twin.s["serving_operator"],
-               "steps": len(trace)}
+               "steps": len(trace), "simulated_minutes": twin.simulated_minutes(),
+               "profile_changes": twin.profile_changes, **audit_counts(audit)}
     explanation = None
     if use_bedrock:
         explanation = _bedrock(llm, (

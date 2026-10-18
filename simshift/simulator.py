@@ -95,7 +95,53 @@ SCENARIOS: dict[str, dict] = {
         "hidden": {"cause": "DE-NET-1 regional outage; DE-NET-2 allowed on active profile",
                    "best_actions": ["try_allowed_operator"]},
     },
+    "FW_LOOP": {
+        "title": "US: devices keep dropping off after a firmware rollout",
+        "incident": "Devices dropping off the network repeatedly",
+        "country": "US",
+        "devices": 5400,
+        "serving_operator": "US-NET-1",
+        "active_profile": "profile_A",
+        "profiles": {"profile_A": {"operators": ["US-NET-1"]}, "profile_B": {"operators": ["US-NET-2"]}},
+        "operators_in_coverage": ["US-NET-1", "US-NET-2"],
+        "networks": {"US-NET-1": "up", "US-NET-2": "up"},
+        "ingestion_healthy": True,
+        "management": {"up": True, "via_cellular": True, "path": "cellular IP via active profile"},
+        "euicc": {"supports_profile_enable": True, "rollback_supported": True},
+        "owner_allows_profile_switch": True,
+        "recent_firmware_change": True,
+        "attempted_retries": 2,
+        "attach_trend": "flapping",
+        "firmware_fault": True,
+        "hidden": {"cause": "firmware 4.2.0 modem reset loop (device-side regression)",
+                   "best_actions": ["investigate_device", "escalate_or_wait"]},
+    },
+    "TRANSIENT": {
+        "title": "France: short burst of attach failures after a cell site restart",
+        "incident": "Short burst of attach failures",
+        "country": "FR",
+        "devices": 2100,
+        "serving_operator": "FR-NET-1",
+        "active_profile": "profile_A",
+        "profiles": {"profile_A": {"operators": ["FR-NET-1"]}, "profile_B": {"operators": ["FR-NET-2"]}},
+        "operators_in_coverage": ["FR-NET-1", "FR-NET-2"],
+        "networks": {"FR-NET-1": "up", "FR-NET-2": "up"},
+        "ingestion_healthy": True,
+        "management": {"up": True, "via_cellular": True, "path": "cellular IP via active profile"},
+        "euicc": {"supports_profile_enable": True, "rollback_supported": True},
+        "owner_allows_profile_switch": True,
+        "recent_firmware_change": False,
+        "attempted_retries": 0,
+        "attach_trend": "improving",
+        "transient_congestion": True,
+        "hidden": {"cause": "radio congestion after a cell site restart; clears on re-attach",
+                   "best_actions": ["retry_connection"]},
+    },
 }
+
+# Simulated minutes each twin action takes while the incident is open (the agent only acts while it is open).
+COST_MIN = {"retry": 5, "operator_reselection": 10, "diagnostics_device": 15, "diagnostics_data_path": 10,
+            "eim_enable_profile": 30, "eim_rollback": 20, "escalated": 60}
 
 
 class FleetTwin:
@@ -129,6 +175,10 @@ class FleetTwin:
         if not self.s.get("device_powered", True):
             return {"attach_success_rate": 0.0, "data_session_rate": 0.0, "app_ack_rate": 0.0, "heartbeat_rate": 0.0}
         reg = self._registered()
+        if reg and (self.s.get("firmware_fault") or self.s.get("transient_congestion")):
+            a = 0.41 if self.s.get("firmware_fault") else 0.62  # modem reset loop / congestion: partial service
+            return {"attach_success_rate": a, "data_session_rate": a - 0.03, "app_ack_rate": a - 0.04,
+                    "heartbeat_rate": a + 0.01}
         attach = 0.997 if reg else 0.04
         ack = 0.995 if (reg and self.s["ingestion_healthy"]) else 0.02 if reg else 0.0
         return {"attach_success_rate": attach, "data_session_rate": 0.99 if reg else 0.03,
@@ -154,6 +204,7 @@ class FleetTwin:
             "alternative_profile_installed": len(s["profiles"]) > 1,
             "management_path_reachable": self.management_reachable(),
             "recent_firmware_change": s["recent_firmware_change"],
+            **({"attach_trend": s["attach_trend"]} if "attach_trend" in s else {}),
             "attempted_retries": s["attempted_retries"],
             "diagnostics": copy.deepcopy(self.diagnostics),
         }
@@ -166,6 +217,8 @@ class FleetTwin:
     # ---- network-side actions ----------------------------------------------------------------
     def retry_with_backoff(self) -> dict:
         self.s["attempted_retries"] += 1
+        if self.s.get("transient_congestion") and self._registered():
+            self.s["transient_congestion"] = False  # congestion clears on a fresh attach; a reset loop does not
         return self._log("retry", restored=self.service_restored(), rates=self.rates())
 
     def operator_reselection(self) -> dict:
@@ -184,6 +237,11 @@ class FleetTwin:
             d = {"available": False, "reason": "device unreachable; no modem logs retrievable"}
         else:
             reg = self._registered()
+            if self.s.get("firmware_fault"):
+                d = {"available": True, "firmware_uniform": True, "modem_resets_per_day": 14.2, "reject_cause": None,
+                     "summary": "modem reset loop on the firmware rolled out before onset; registration accepted between resets"}
+                self.diagnostics["device"] = d
+                return self._log("diagnostics_device", result=d)
             d = {"available": True, "firmware_uniform": True, "modem_resets_per_day": 0.1,
                  "reject_cause": None if reg else "#17 network failure from serving operator",
                  "summary": "modem healthy" if reg else
@@ -201,6 +259,11 @@ class FleetTwin:
                  "summary": "cellular + APN healthy; ingestion endpoint rejecting payloads since deploy ingest-v2.14"}
         elif not self._registered():
             d = {"pdn_sessions": "none", "summary": f"no data sessions; attach failing on {s['serving_operator']}"}
+        elif s.get("firmware_fault"):
+            d = {"pdn_sessions": "flapping", "apn": "ok", "summary": "sessions drop and re-establish repeatedly; APN and ingestion healthy"}
+        elif s.get("transient_congestion"):
+            d = {"pdn_sessions": "partly established", "apn": "ok",
+                 "summary": f"intermittent RRC setup failures on {s['serving_operator']} cells; failure rate falling"}
         else:
             d = {"pdn_sessions": "established", "apn": "ok", "summary": "data path healthy"}
         self.diagnostics["data_path"] = d
@@ -234,6 +297,12 @@ class FleetTwin:
                             restored=self.service_restored(), rates=self.rates())
         self.commands[idempotency_key] = res
         return res
+
+    def escalate(self) -> dict:
+        return self._log("escalated", evidence=copy.deepcopy(self.diagnostics))
+
+    def simulated_minutes(self) -> int:
+        return sum(COST_MIN.get(e["kind"], 0) for e in self.events)
 
     def rollback_profile(self, previous: str, previous_operator: str) -> dict:
         if not self.s["euicc"]["rollback_supported"]:

@@ -50,7 +50,8 @@ def test_no_truth_leakage():
         dec = ScriptedDecider(["investigate_data_path"])
         r = run(sid, approve=True, decider=dec, use_bedrock=False)
         sent = "".join(dec.calls) + json.dumps([t["decision"]["state"] for t in r["trace"]])
-        for secret in (sc["hidden"]["cause"], sid, "best_actions", '"networks"', "ingestion_healthy"):
+        for secret in (sc["hidden"]["cause"], sid, "best_actions", '"networks"', "ingestion_healthy",
+                       "firmware_fault", "transient_congestion"):
             assert secret not in sent, (sid, secret)
 
 
@@ -99,7 +100,7 @@ def test_no_truth_leakage_in_bedrock_prompts(monkeypatch):
         if sid == "BR_PROFILE":
             assert r["outcome"]["restored"] and len(prompts) == 2  # plan + explanation both checked
         for secret in (sc["hidden"]["cause"], sid, "best_actions", '"networks"', "ingestion_healthy",
-                       "device_powered", '"hidden"'):
+                       "device_powered", '"hidden"', "firmware_fault", "transient_congestion"):
             assert secret not in sent, (sid, secret)
 
 
@@ -131,4 +132,34 @@ def test_published_runs_replay_identically(name):
     assert [t["tool"] for t in r["trace"]] == [t["tool"] for t in rec["trace"]]
     assert [t["decision"] and t["decision"]["route"] for t in r["trace"]] == \
            [t["decision"] and t["decision"]["route"] for t in rec["trace"]]
-    assert r["outcome"] == rec["outcome"]
+    assert {k: r["outcome"][k] for k in rec["outcome"]} == rec["outcome"]  # newer runs record more fields
+
+
+def test_audit_counts_a_forbidden_execution_when_the_gate_is_missing():
+    from strands import Agent
+    from strands.models import BedrockModel
+
+    from simshift.agent import audit_counts, build_tools, watch_tool_calls
+    from simshift.simulator import FleetTwin
+    twin = FleetTwin("OFFLINE")  # investigate_device is excluded: devices unreachable
+    gated = run("OFFLINE", decider=ScriptedDecider(["investigate_data_path"]), use_bedrock=False)
+    assert gated["outcome"]["forbidden_executions"] == 0
+    bare = Agent(model=BedrockModel(model_id="unused", region_name="us-east-1"),
+                 tools=build_tools(twin, False, None), callback_handler=None)  # no policy gate
+    audit = watch_tool_calls(bare, twin)
+    bare.tool.query_firmware_modem_diagnostics()
+    assert audit_counts(audit) == {"forbidden_executions": 1, "blocked_calls": 0}
+
+
+def test_gate_denial_is_counted_as_blocked():
+    from simshift.agent import audit_counts, build_tools, make_router, watch_tool_calls
+    from simshift.simulator import FleetTwin
+    from strands import Agent
+    from strands.models import BedrockModel
+    twin = FleetTwin("OFFLINE")
+    agent = Agent(model=BedrockModel(model_id="unused", region_name="us-east-1"), tools=build_tools(twin, True, None),
+                  interventions=[make_router(None).gate(twin.observe)], callback_handler=None)
+    audit = watch_tool_calls(agent, twin)
+    res = agent.tool.prepare_guarded_profile_transition()
+    assert res["status"] == "error" and audit_counts(audit) == {"forbidden_executions": 0, "blocked_calls": 1}
+    assert not any(e["kind"].startswith("eim_") for e in twin.events)

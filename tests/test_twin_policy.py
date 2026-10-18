@@ -1,6 +1,6 @@
 import json
 
-from simshift.policy import exclusions, guarded_profile_transition, proposal_id
+from simshift.policy import counterfactual, exclusions, guarded_profile_transition, proposal_id
 from simshift.simulator import SCENARIOS, FleetTwin
 
 
@@ -147,3 +147,35 @@ def test_transition_timeline():
     off = FleetTwin("OFFLINE")
     blocked = guarded_profile_transition(off, "profile_B", proposal_id(off, "profile_B"))["transition"]
     assert blocked == ["REQUESTED", "BLOCKED"] and "SENT" not in blocked
+
+
+def test_counterfactual_cannot_force_ota_on_offline():
+    twin = FleetTwin("OFFLINE")
+    cf = counterfactual(twin, "evaluate_profile_change")
+    assert cf["excluded"] and cf["result"]["transition"] == ["REQUESTED", "BLOCKED"]
+    assert "management_path_reachable" in cf["result"]["gate"]["failed"] and not twin.events  # real twin untouched
+
+
+def test_counterfactual_shows_cost_of_wrong_choice():
+    twin = FleetTwin("DE_OPERATOR")
+    right, wrong = counterfactual(twin, "try_allowed_operator"), counterfactual(twin, "retry_connection")
+    assert right["restored"] and not wrong["restored"] and not twin.events
+
+
+def test_firmware_loop_is_not_fixed_by_the_network_side():
+    twin = FleetTwin("FW_LOOP")
+    twin.retry_with_backoff(); twin.retry_with_backoff()  # 4 of the 5 allowed
+    assert not twin.service_restored()
+    assert "reset loop" in twin.firmware_modem_diagnostics()["result"]["summary"]
+    ex = exclusions(twin.observe())
+    assert "evaluate_profile_change" in ex and "reset loop" in ex["retry_connection"]
+    assert not guarded_profile_transition(twin, "profile_B", proposal_id(twin, "profile_B"))["executed"]
+
+
+def test_transient_clears_on_retry_only():
+    twin = FleetTwin("TRANSIENT")
+    assert twin.observe()["attach_trend"] == "improving" and not twin.service_restored()
+    twin.data_path_diagnostics(); twin.firmware_modem_diagnostics()
+    assert not twin.service_restored()
+    twin.retry_with_backoff()
+    assert twin.service_restored() and twin.s["active_profile"] == "profile_A"

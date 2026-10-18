@@ -4,6 +4,7 @@ from __future__ import annotations
 from .simulator import RESTORED_THRESHOLD, FleetTwin, idempotency_key
 
 MAX_RETRIES = 5
+MAX_RESETS_PER_DAY = 5  # above this the fault is on the device, not the network
 
 # Option -> description shown to Decider. Says when each tool fits; never mentions hidden truth.
 OPTIONS = {
@@ -25,6 +26,8 @@ def exclusions(obs: dict) -> dict[str, str]:
         out["retry_connection"] = f"retry budget exhausted ({MAX_RETRIES})"
     elif obs["attach_success_rate"] >= RESTORED_THRESHOLD:
         out["retry_connection"] = "registration already healthy; re-attaching cannot help"
+    elif obs["diagnostics"].get("device", {}).get("modem_resets_per_day", 0) > MAX_RESETS_PER_DAY:
+        out["retry_connection"] = "modem reset loop on the devices; re-attaching cannot help"
     if not obs["other_operator_allowed_on_active_profile"]:
         out["try_allowed_operator"] = "active profile permits no other operator in coverage"
     if not obs["management_path_reachable"]:
@@ -105,3 +108,20 @@ def _done(out: dict, states: list[str]) -> dict:
     if tuple(states) not in TRANSITION_PATHS:
         raise RuntimeError(f"illegal eUICC transition path {states}")
     return {**out, "transition": states}
+
+
+def counterfactual(twin: FleetTwin, option: str) -> dict:
+    """What `option` would have done from this state, run on a clone; the real twin is untouched. Policy
+    exclusions are reported but not enforced, so a rejected option can be shown failing. A profile change
+    still goes through the full gate (approval is granted on the clone only), so it can never be forced."""
+    c = twin.clone()
+    actions = {"retry_connection": c.retry_with_backoff, "try_allowed_operator": c.operator_reselection,
+               "investigate_device": c.firmware_modem_diagnostics, "investigate_data_path": c.data_path_diagnostics,
+               "escalate_or_wait": c.escalate}
+    if option == "evaluate_profile_change":
+        target = next(p for p in c.s["profiles"] if p != c.s["active_profile"])
+        result = guarded_profile_transition(c, target, proposal_id(c, target))
+    else:
+        result = actions[option]()
+    return {"option": option, "excluded": exclusions(twin.observe()).get(option), "result": result,
+            "restored": c.service_restored(), "rates": c.rates(), "simulated_minutes": c.simulated_minutes()}
