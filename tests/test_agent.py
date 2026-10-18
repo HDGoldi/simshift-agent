@@ -65,7 +65,9 @@ def _decider_up(url):
 URL = os.environ.get("DECIDER_URL", "http://127.0.0.1:8099")
 
 
-@pytest.mark.skipif(not _decider_up(URL), reason="Decider server not running")
+# Skips without a server, unless SIMSHIFT_REQUIRE_DECIDER=1: then a missing Decider is a failure, not a skip.
+@pytest.mark.skipif(not _decider_up(URL) and os.environ.get("SIMSHIFT_REQUIRE_DECIDER") != "1",
+                    reason="Decider server not running")
 def test_decider_is_real():
     r = run("BR_PROFILE", approve=True, decider=DeciderClient(URL), use_bedrock=False)
     raw = r["trace"][0]["decision"]["raw"]

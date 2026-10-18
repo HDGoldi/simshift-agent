@@ -2,7 +2,7 @@
 
 > **Reusable decision pattern** for the Strands Decider 2B hackathon (`#strands-decider-2b` `#tool-selection`).
 > Worked examples: [`example.py`](example.py) (web-service remediation) and [`simshift/agent.py`](../../simshift/agent.py)
-> (IoT connectivity recovery: `make_router()` builds the router, `run()` calls `router.step()` each turn).
+> (IoT connectivity recovery: `make_router()` builds the router, `Incident.step()` calls `router.step()` each turn).
 
 **Pattern tag:** `#tool-selection` · **Model:** `StrandsAgents/strands-decider-2B-qwen3.5-v1-2610` · **Domain-free** (no telecom code)
 
@@ -54,6 +54,7 @@ supports `noul` (yes/no) and `score` question types; the spike in `spikes/decide
 | below the threshold, no read-only option left | `fallback` | your fallback (hold / hand off) |
 | only the fallback is admissible | `fallback` | no model call |
 | Decider unreachable, a malformed answer, or a choice outside the offered options | `fallback` | your fallback; the error or raw answer is kept in the decision |
+| an answer that does not fit the question: probabilities not over exactly the offered options, not summing to 1, a choice that is not the most probable option, or a confidence that is not `(N·p_max − 1)/(N − 1)` | `fallback` | your fallback; every real answer we recorded passes these checks |
 
 Excluded options are never shown to the model. The router does not offer forbidden actions and then hope the model avoids them.
 
@@ -83,6 +84,27 @@ To rerun a saved trace without a Decider server, pass `ReplayDecider([...recorde
 It returns the recorded answers in order and refuses, which sends the step to the fallback, as soon as the live state,
 question or options differ from the recording.
 
+## Adapting it
+
+1. Write the **options** as `name -> description`, and put *when each option suits* into the description. The model
+   only sees these words, so they matter more than the names.
+2. Write the **policy** as a pure function of observable state that returns `{option: reason}` for everything that is
+   unsafe or pointless right now. Keep it deterministic. Anything you would refuse in a code review belongs here, not
+   in the prompt.
+3. Pick a **fallback** that is always safe (hold, hand off, page a human) and mark the **read-only** options.
+4. Keep hidden or evaluator-only facts out of `state`. Decider sees exactly what you pass.
+5. Record `Decision` objects. They carry the question, the state, what was excluded and why, the raw answer and the
+   route, which is what you need for an audit and for `ReplayDecider`.
+
+## Let an LLM run the loop without letting it pick the tool
+
+In SIMShift a Bedrock model runs the Strands agent loop, but it only gets two tools and neither takes an argument:
+`get_incident_state` and `advance_recovery`. The second one calls `router.step(...)` on an inner agent that holds
+the routed tools and the gate ([`simshift/orchestrator.py`](../../simshift/orchestrator.py)). The LLM decides when to
+look, when to continue and how to report. It has no parameter through which it could name a tool, skip the policy or
+approve anything. The tests in [`tests/test_orchestrator.py`](../../tests/test_orchestrator.py) drive the real Strands
+event loop with a scripted model to check exactly that.
+
 Run the self-contained, non-telecom example (it needs a local Decider server):
 
 ```bash
@@ -93,15 +115,17 @@ pytest patterns/capability_aware_router/tests      # no model or AWS needed
 
 ## Tested properties
 
-- `test_tool_routing_follows_decider_choice`: changing the Decider choice changes which Strands tool executes.
-- `test_capability_filter_never_offers_excluded_option`: excluded options never reach the model.
-- `test_low_confidence_gathers_evidence_then_falls_back`: the low-confidence routes.
-- `test_forbidden_action_denied_even_on_direct_call`: the gate blocks excluded tools on any call path.
-- `test_only_fallback_admissible_skips_model_call`: no model call when there is nothing to decide.
-- `test_decider_failure_fails_closed` and `test_non_admissible_choice_falls_back`: an outage or an off-menu answer routes to the fallback.
-- `test_malformed_answer_fails_closed`: an answer with a missing or mistyped field routes to the fallback.
-- `test_replay_refuses_a_different_question` and `test_replay_keeps_recorded_outages_in_order`: a recorded answer is
-  never applied to a changed state, and recorded outages replay at their own step.
+One file per property in [`tests/`](tests/). No model download and no AWS.
+
+- `test_tool_routing.py`: changing the Decider choice changes which Strands tool executes.
+- `test_capability_filter.py`: excluded options never reach the model, and no model call is made when only the
+  fallback is admissible.
+- `test_low_confidence.py`: below the threshold the most probable read-only option runs, else the fallback.
+- `test_forbidden_action.py`: the gate blocks an excluded tool on any call path, including a direct call.
+- `test_fail_closed.py`: an outage, an off-menu choice, a malformed answer or an inconsistent answer each route to
+  the fallback.
+- `test_replay.py`: a recorded answer is never applied to a changed state, and recorded outages replay at their own step.
+- `test_pattern_is_domain_free.py`: nothing in the pattern imports SIMShift code.
 
 ## Limits
 
