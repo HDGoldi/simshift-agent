@@ -1,0 +1,32 @@
+{
+  "id": "BR_PROFILE",
+  "synthetic": true,
+  "observable": {
+    "affected_devices": 3200,
+    "attach_success_rate": 0.04,
+    "data_sessions_active_rate": 0.03,
+    "application_ack_rate": 0.03,
+    "last_heartbeat_minutes_ago": 1,
+    "active_profile": "profile_A",
+    "allowed_alternative_operator_available": false,
+    "alternative_profile_installed": true,
+    "management_path_reachable": true,
+    "recent_firmware_change": false,
+    "attempted_retries": 3,
+    "incident": "Persistent cellular attach failures in Brazil cohort",
+    "country": "BR",
+    "euicc_supports_remote_enable": true,
+    "profile_change_permitted_by_owner": true,
+    "findings": [],
+    "steps_taken": [],
+    "profile_change_pending": false,
+    "escalated": false
+  },
+  "evaluator_only": {
+    "true_cause": "active_profile_not_viable_in_region",
+    "acceptable_next": [
+      "evaluate_profile_change"
+    ],
+    "seed_note": "outcomes are deterministic per seed; see simulator/twin.py"
+  }
+}

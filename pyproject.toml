@@ -1,21 +1,38 @@
-[project]
-name = "simshift"
-version = "0.1.0"
-description = "SIMShift: capability-aware IoT connectivity recovery agent (Strands Decider 2B + Amazon Bedrock) on a synthetic digital twin"
-requires-python = ">=3.12"
-license = "Apache-2.0"
-dependencies = ["strands-agents==1.61.1", "pydantic>=2"]
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
 
-[dependency-groups]
-dev = ["pytest>=8"]
+[project]
+name = "simshift-agent"
+version = "0.1.0"
+description = "SIMShift: an IoT connectivity recovery agent that uses Strands Decider 2B to choose the next safe tool (simulated)."
+readme = "README.md"
+license = "Apache-2.0"
+license-files = ["LICENSE"]
+requires-python = ">=3.10"
+# Core (router pattern + simulator) is standard-library only.
+dependencies = []
+
+[project.optional-dependencies]
+agent = ["strands-agents==1.61.1", "boto3==1.43.114"]
+ui = ["fastapi==0.144.0", "uvicorn==0.54.0"]
+# Local model server. On Linux without a GPU install CPU torch first (see Makefile).
+decider-server = ["strands-decider==0.1.0"]
+dev = ["pytest==8.4.2", "ruff==0.17.1", "httpx==0.28.1"]
+
+[tool.setuptools.packages.find]
+include = ["agent*", "decider*", "simulator*", "patterns*", "evaluation*", "web*"]
+
+[tool.setuptools.package-data]
+simulator = ["scenarios/*.json"]
+web = ["static/*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests", "patterns/capability_aware_router/tests"]
 pythonpath = ["."]
+markers = ["live: needs a running strands-decider server"]
 
-[tool.setuptools]
-packages = ["simshift", "patterns", "patterns.capability_aware_router"]
-
-[build-system]
-requires = ["setuptools>=77"]
-build-backend = "setuptools.build_meta"
+[tool.ruff]
+line-length = 110
+target-version = "py310"
+extend-exclude = ["spike"]

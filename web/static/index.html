@@ -1,0 +1,138 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>SIMShift · When Not to Switch</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <header class="top">
+    <div class="brand">
+      <span class="logo" aria-hidden="true">◉</span>
+      <div>
+        <h1>SIMShift</h1>
+        <p class="tag">When not to switch: IoT connectivity recovery</p>
+      </div>
+    </div>
+    <div class="chips">
+      <span class="chip warn" title="All devices, networks and eSIM operations are synthetic">SIMULATED FLEET</span>
+      <span class="chip" id="decider-chip" role="status">Decider: checking…</span>
+    </div>
+  </header>
+
+  <main class="grid">
+    <!-- LEFT: scenarios + fleet -->
+    <section class="col">
+      <div class="panel">
+        <h2>Incidents</h2>
+        <div id="scenarios" class="scenarios" role="list"></div>
+      </div>
+
+      <div class="panel" id="fleet-panel" aria-live="polite">
+        <h2>Fleet cohort</h2>
+        <div id="fleet-empty" class="muted">Pick an incident to load it.</div>
+        <div id="fleet" hidden>
+          <div class="fleet-head">
+            <div><span class="big" id="f-devices">0</span> <span class="muted">devices</span></div>
+            <div id="f-status" class="status-pill">—</div>
+          </div>
+          <div class="dots" id="f-dots" aria-hidden="true"></div>
+          <div class="meter"><label>Registration</label><div class="bar"><i id="f-reg"></i></div><span id="f-reg-t"></span></div>
+          <div class="meter"><label>App telemetry</label><div class="bar"><i id="f-app"></i></div><span id="f-app-t"></span></div>
+          <dl class="kv">
+            <dt>Downtime (sim)</dt><dd id="f-down">0 min</dd>
+            <dt>Profile changes</dt><dd id="f-pc">0</dd>
+            <dt>Unnecessary changes</dt><dd id="f-un">0</dd>
+            <dt>Blocked actions</dt><dd id="f-bl">0</dd>
+            <dt>Forbidden executions</dt><dd id="f-fe">0</dd>
+          </dl>
+        </div>
+      </div>
+    </section>
+
+    <!-- MIDDLE: decision inspector -->
+    <section class="col wide">
+      <div class="panel">
+        <div class="panel-head">
+          <h2>Recovery Decision Inspector</h2>
+          <div class="controls">
+            <button id="btn-step" disabled>Next step</button>
+            <button id="btn-auto" class="secondary" disabled>Run to end</button>
+          </div>
+        </div>
+        <p class="question"><b>Typed question (choice):</b> <span id="q"></span></p>
+
+        <div id="approval" class="approval" hidden role="alertdialog" aria-labelledby="approval-title">
+          <h3 id="approval-title">Human approval needed</h3>
+          <p id="approval-plan"></p>
+          <p class="muted">Decider cannot approve this. The deterministic checks have passed; a person decides.</p>
+          <div class="controls">
+            <button id="btn-approve">Approve profile change</button>
+            <button id="btn-reject" class="danger">Reject</button>
+          </div>
+        </div>
+
+        <div id="thinking" class="thinking" hidden role="status">Strands Decider 2B is choosing…</div>
+        <div id="done" class="done" hidden role="status"></div>
+
+        <div class="split">
+          <div>
+            <h3>Options this step</h3>
+            <table class="opts" aria-describedby="q">
+              <thead><tr><th>Option</th><th>Policy</th><th>Decider probability</th></tr></thead>
+              <tbody id="opts"></tbody>
+            </table>
+            <div class="meta" id="meta"></div>
+          </div>
+          <div>
+            <h3>State text sent to Decider</h3>
+            <pre id="state-text" class="state">—</pre>
+          </div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <h2>Decision trace</h2>
+        <ol id="trace" class="trace"></ol>
+      </div>
+    </section>
+
+    <!-- RIGHT: eUICC + counterfactuals + events -->
+    <section class="col">
+      <div class="panel">
+        <h2>Virtual eUICC / eIM</h2>
+        <dl class="kv">
+          <dt>Enabled profile</dt><dd id="e-enabled">—</dd>
+          <dt>Installed</dt><dd id="e-installed">—</dd>
+        </dl>
+        <h3>Profile-change checks</h3>
+        <ul id="guards" class="guards"></ul>
+        <h3>Transition timeline</h3>
+        <ol id="timeline" class="timeline"><li class="muted">No profile transition yet.</li></ol>
+      </div>
+
+      <div class="panel">
+        <h2>Counterfactuals</h2>
+        <p class="muted small">Runs on a fresh clone of this scenario. The agent did not choose these.</p>
+        <div class="controls col-controls">
+          <button class="secondary" data-cf="force">Force a profile change</button>
+          <button class="secondary" data-cf="evaluate_profile_change">What if: approve a profile switch</button>
+          <button class="secondary" data-cf="retry_connection,retry_connection">What if: just keep retrying</button>
+        </div>
+        <div id="cf-out" class="cf-out" aria-live="polite"></div>
+      </div>
+
+      <div class="panel">
+        <h2>Event log</h2>
+        <ol id="events" class="events"></ol>
+      </div>
+    </section>
+  </main>
+
+  <footer class="foot">
+    Synthetic data only. Not a GSMA SGP.32 implementation. No carrier, eUICC or customer system is contacted.
+  </footer>
+  <script src="/static/app.js"></script>
+</body>
+</html>

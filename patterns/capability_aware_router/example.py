@@ -1,75 +1,77 @@
-"""Non-telecom example: pick the next remediation tool for a failing web service.
+"""Non-telecom example: route a cloud-ops incident with the Capability-Aware Router.
 
-    strands-decider serve StrandsAgents/strands-decider-2B-qwen3.5-v1-2610 --device mlx --port 8099
+    strands-decider serve StrandsAgents/strands-decider-2B-qwen3.5-v1-2610 --port 8099
     python -m patterns.capability_aware_router.example
 
-No AWS needed: tools are invoked directly, so the Bedrock model object below is never called.
+`--fake` runs without a model server (fixed answer), to show the wiring only.
 """
+
+from __future__ import annotations
+
 import json
+import sys
 
-from strands import Agent, tool
-from strands.models import BedrockModel
-
-from patterns.capability_aware_router.router import CapabilityAwareRouter, DeciderClient
-
-state = {"service": "checkout-api", "error_rate": 0.31, "p95_latency_ms": 4200, "deployed_minutes_ago": 12,
-         "previous_release_available": True, "cpu_utilization": 0.35, "findings": []}
-
-
-@tool
-def rollback_release() -> str:
-    """Roll back to the previous release."""
-    return "rolled back to v41"
+from patterns.capability_aware_router import (
+    CapabilityAwareRouter,
+    Decision,
+    HttpDeciderClient,
+    Option,
+    Rule,
+    RulePolicy,
+)
 
 
-@tool
-def scale_out() -> str:
-    """Add replicas."""
-    return "scaled 6 -> 12"
+def restart_service(s):  return f"restarted {s['service']}"
+def roll_back_deploy(s): return f"rolled back {s['service']} to {s['previous_version']}"
+def read_logs(s):        return f"collected last 15 min of logs for {s['service']}"
+def page_on_call(s):     return "paged on-call engineer"
 
 
-@tool
-def inspect_logs() -> str:
-    """Read-only: fetch recent error logs."""
-    state["findings"].append("NullPointerException in PaymentClient since v42 deploy")
-    return state["findings"][-1]
+OPTIONS = [
+    Option("restart_service", "restart the failing service; fits crashes with no recent change", restart_service),
+    Option("roll_back_deploy", "roll back to the previous version; fits errors that began right after a deploy", roll_back_deploy, risky=True),
+    Option("read_logs", "read-only: collect recent logs to learn more", read_logs),
+    Option("page_on_call", "hand the incident to a human", page_on_call),
+]
+
+POLICY = RulePolicy([
+    Rule("roll_back_deploy", lambda s: s["previous_version"] is None, "no previous version to roll back to"),
+    Rule("restart_service", lambda s: s["restarts_last_hour"] >= 3, "restart budget spent"),
+])
+
+STATE = {
+    "service": "checkout-api",
+    "error_rate": 0.31,
+    "minutes_since_deploy": 4,
+    "previous_version": "v412",
+    "restarts_last_hour": 3,
+}
 
 
-@tool
-def page_oncall() -> str:
-    """Hand off to a human."""
-    return "paged on-call"
+class _Fake:
+    def choose(self, state, question, criteria):
+        c = next(iter(criteria))
+        return Decision(choice=c, probabilities={c: 1.0}, confidence=1.0, model="fake")
 
 
-def policy(s: dict) -> dict[str, str]:
-    out = {}
-    if not s["previous_release_available"]:
-        out["rollback_release"] = "no previous release to roll back to"
-    if s["cpu_utilization"] < 0.6:
-        out["scale_out"] = "CPU has headroom; more replicas cannot fix errors"
-    if s["findings"]:
-        out["inspect_logs"] = "logs already inspected"
-    return out
+def main() -> None:
+    decider = _Fake() if "--fake" in sys.argv else HttpDeciderClient()
+    router = CapabilityAwareRouter(
+        question="Which next action most safely restores the service?",
+        options=OPTIONS,
+        policy=POLICY,
+        decider=decider,
+        describe=lambda s: (
+            f"Service {s['service']} error rate {s['error_rate']:.0%}. "
+            f"Deployed {s['minutes_since_deploy']} minutes ago. Restarts in last hour: {s['restarts_last_hour']}."
+        ),
+        low_confidence=0.3,
+        fallback="read_logs",
+        # demo approval gate: pass --approve to allow risky options. Replace with your own human check.
+        approve=lambda s, o: "--approve" in sys.argv,
+    )
+    print(json.dumps(router.step(STATE).to_trace(), indent=2))
 
-
-router = CapabilityAwareRouter(
-    decider=DeciderClient("http://127.0.0.1:8099"),
-    instructions="Which next remediation step most safely restores the service?",
-    options={"rollback_release": "Revert to the previous release; suits regressions after a recent deploy",
-             "scale_out": "Add capacity; suits saturation",
-             "inspect_logs": "Read-only: look at recent error logs",
-             "page_oncall": "Hand off to a human"},
-    tools={"rollback_release": "rollback_release", "scale_out": "scale_out",
-           "inspect_logs": "inspect_logs", "page_oncall": "page_oncall"},
-    policy=policy, fallback="page_oncall", read_only=frozenset({"inspect_logs"}))
-
-agent = Agent(model=BedrockModel(region_name="us-east-1"), tools=[rollback_release, scale_out, inspect_logs, page_oncall],
-              interventions=[router.gate(lambda: state)], callback_handler=None)
 
 if __name__ == "__main__":
-    for _ in range(3):
-        d, res = router.step(agent, state)
-        print(json.dumps({"excluded": d.excluded, "decider": d.raw, "route": d.route, "tool": d.tool,
-                          "result": res["content"][0]["text"]}, indent=1))
-        if d.selected in ("rollback_release", "page_oncall"):
-            break
+    main()

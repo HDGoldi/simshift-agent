@@ -1,0 +1,32 @@
+{
+  "id": "OFFLINE",
+  "synthetic": true,
+  "observable": {
+    "affected_devices": 1250,
+    "attach_success_rate": 0.0,
+    "data_sessions_active_rate": 0.0,
+    "application_ack_rate": 0.0,
+    "last_heartbeat_minutes_ago": 720,
+    "active_profile": "profile_A",
+    "allowed_alternative_operator_available": false,
+    "alternative_profile_installed": true,
+    "management_path_reachable": false,
+    "recent_firmware_change": false,
+    "attempted_retries": 2,
+    "incident": "Remote cohort silent; no heartbeat",
+    "country": "XX",
+    "euicc_supports_remote_enable": true,
+    "profile_change_permitted_by_owner": true,
+    "findings": [],
+    "steps_taken": [],
+    "profile_change_pending": false,
+    "escalated": false
+  },
+  "evaluator_only": {
+    "true_cause": "no_coverage_no_management_path",
+    "acceptable_next": [
+      "escalate_or_wait"
+    ],
+    "seed_note": "outcomes are deterministic per seed; see simulator/twin.py"
+  }
+}

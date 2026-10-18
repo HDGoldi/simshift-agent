@@ -1,0 +1,3592 @@
+{
+  "meta": {
+    "created": "2026-10-18T16:28:18Z",
+    "split": "heldout",
+    "per_family": 5,
+    "seed_range": "9000..+4",
+    "decider_model": "strands-decider-2B-qwen3.5-v1-2610",
+    "decider_device": "cpu",
+    "hardware": "x86_64, 4 vCPU, no GPU"
+  },
+  "results": {
+    "rules": {
+      "summary": {
+        "n": 30,
+        "first_tool_preferred_pct": 100.0,
+        "first_tool_acceptable_pct": 100.0,
+        "resolved_correctly_pct": 100.0,
+        "unnecessary_profile_changes": 0,
+        "profile_changes": 5,
+        "blocked_actions": 0,
+        "forbidden_executions": 0,
+        "mean_steps": 1.33,
+        "mean_downtime_min": 25.8,
+        "decisions": 40,
+        "latency_p50_ms": 0.0,
+        "latency_p95_ms": 0.0,
+        "low_conf_n": 0,
+        "low_conf_first_acceptable_pct": 0.0,
+        "high_conf_n": 30,
+        "high_conf_first_acceptable_pct": 100.0,
+        "wall_seconds": 0.0,
+        "by_family": {
+          "operator": {
+            "n": 5,
+            "first_acceptable_pct": 100.0,
+            "resolved_correctly_pct": 100.0
+          },
+          "profile": {
+            "n": 5,
+            "first_acceptable_pct": 100.0,
+            "resolved_correctly_pct": 100.0
+          },
+          "application": {
+            "n": 5,
+            "first_acceptable_pct": 100.0,
+            "resolved_correctly_pct": 100.0
+          },
+          "unreachable": {
+            "n": 5,
+            "first_acceptable_pct": 100.0,
+            "resolved_correctly_pct": 100.0
+          },
+          "firmware": {
+            "n": 5,
+            "first_acceptable_pct": 100.0,
+            "resolved_correctly_pct": 100.0
+          },
+          "transient": {
+            "n": 5,
+            "first_acceptable_pct": 100.0,
+            "resolved_correctly_pct": 100.0
+          }
+        }
+      },
+      "incidents": [
+        {
+          "id": "operator-9000",
+          "family": "operator",
+          "first_choice": "try_allowed_operator",
+          "first_confidence": 1.0,
+          "first_preferred": true,
+          "first_acceptable": true,
+          "resolved_correctly": true,
+          "steps": 1,
+          "downtime_minutes": 5,
+          "profile_changes": 0,
+          "unnecessary_profile_changes": 0,
+          "blocked_actions": 0,
+          "forbidden_executions": 0,
+          "decisions": 1,
+          "latencies_ms": [
+            0.0
+          ],
+          "trace": [
+            {
+              "choice": "try_allowed_operator",
+              "confidence": 1.0,
+              "removed": [
+                "evaluate_profile_change"
+              ],
+              "approval": null
+            }
+          ]
+        },
+        {
+          "id": "operator-9001",
+          "family": "operator",
+          "first_choice": "try_allowed_operator",
+          "first_confidence": 1.0,
+          "first_preferred": true,
+          "first_acceptable": true,
+          "resolved_correctly": true,
+          "steps": 1,
+          "downtime_minutes": 5,
+          "profile_changes": 0,
+          "unnecessary_profile_changes": 0,
+          "blocked_actions": 0,
+          "forbidden_executions": 0,
+          "decisions": 1,
+          "latencies_ms": [
+            0.0
+          ],
+          "trace": [
+            {
+              "choice": "try_allowed_operator",
+              "confidence": 1.0,
+              "removed": [],
+              "approval": null
+            }
+          ]
+        },
+        {
+          "id": "operator-9002",
+          "family": "operator",
+          "first_choice": "try_allowed_operator",
+          "first_confidence": 1.0,
+          "first_preferred": true,
+          "first_acceptable": true,
+          "resolved_correctly": true,
+          "steps": 1,
+          "downtime_minutes": 5,
+          "profile_changes": 0,
+          "unnecessary_profile_changes": 0,
+          "blocked_actions": 0,
+          "forbidden_executions": 0,
+          "decisions": 1,
+          "latencies_ms": [
+            0.0
+          ],
+          "trace": [
+            {
+              "choice": "try_allowed_operator",
+              "confidence": 1.0,
+              "removed": [],
+              "approval": null
+            }
+          ]
+        },
+        {
+          "id": "operator-9003",
+          "family": "operator",
+          "first_choice": "try_allowed_operator",
+          "first_confidence": 1.0,
+          "first_preferred": true,
+          "first_acceptable": true,
+          "resolved_correctly": true,
+          "steps": 1,
+          "downtime_minutes": 5,
+          "profile_changes": 0,
+          "unnecessary_profile_changes": 0,
+          "blocked_actions": 0,
+          "forbidden_executions": 0,
+          "decisions": 1,
+          "latencies_ms": [
+            0.0
+          ],
+          "trace": [
+            {
+              "choice": "try_allowed_operator",
+              "confidence": 1.0,
+              "removed": [
+                "evaluate_profile_change"
+              ],
+              "approval": null
+            }
+          ]
+        },
+        {
+          "id": "operator-9004",
+          "family": "operator",
+          "first_choice": "try_allowed_operator",
+          "first_confidence": 1.0,
+          "first_preferred": true,
+          "first_acceptable": true,
+          "resolved_correctly": true,
+          "steps": 1,
+          "downtime_minutes": 5,
+          "profile_changes": 0,
+          "unnecessary_profile_changes": 0,
+          "blocked_actions": 0,
+          "forbidden_executions": 0,
+          "decisions": 1,
+          "latencies_ms": [
+            0.0
+          ],
+          "trace": [
+            {
+              "choice": "try_allowed_operator",
+              "confidence": 1.0,
+              "removed": [],
+              "approval": null
+            }
+          ]
+        },
+        {
+          "id": "profile-9000",
+          "family": "profile",
+          "first_choice": "evaluate_profile_change",
+          "first_confidence": 1.0,
+          "first_preferred": true,
+          "first_acceptable": true,
+          "resolved_correctly": true,
+          "steps": 1,
+          "downtime_minutes": 25,
+          "profile_changes": 1,
+          "unnecessary_profile_changes": 0,
+          "blocked_actions": 0,
+          "forbidden_executions": 0,
+          "decisions": 1,
+          "latencies_ms": [
+            0.0
+          ],
+          "trace": [
+            {
+              "choice": "evaluate_profile_change",
+              "confidence": 1.0,
+              "removed": [
+                "try_allowed_operator",
+                "retry_connection"
+              ],
+              "approval": "approved"
+            }
+          ]
+        },
+        {
+          "id": "profile-9001",
+          "family": "profile",
+          "first_choice": "evaluate_profile_change",
+          "first_confidence": 1.0,
+          "first_preferred": true,
+          "first_acceptable": true,
+          "resolved_correctly": true,
+          "steps": 1,
+          "downtime_minutes": 25,
+          "profile_changes": 1,
+          "unnecessary_profile_changes": 0,
+          "blocked_actions": 0,
+          "forbidden_executions": 0,
+          "decisions": 1,
+          "latencies_ms": [
+            0.0
+          ],
+          "trace": [
+            {
+              "choice": "evaluate_profile_change",
+              "confidence": 1.0,
+              "removed": [
+                "try_allowed_operator",
+                "retry_connection"
+              ],
+              "approval": "approved"
+            }
+          ]
+        },
+        {
+          "id": "profile-9002",
+          "family": "profile",
+          "first_choice": "evaluate_profile_change",
+          "first_confidence": 1.0,
+          "first_preferred": true,
+          "first_acceptable": true,
+          "resolved_correctly": true,
+          "steps": 1,
+          "downtime_minutes": 25,
+          "profile_changes": 1,
+          "unnecessary_profile_changes": 0,
+          "blocked_actions": 0,
+          "forbidden_executions": 0,
+          "decisions": 1,
+          "latencies_ms": [
+            0.0
+          ],
+          "trace": [
+            {
+              "choice": "evaluate_profile_change",
+              "confidence": 1.0,
+              "removed": [
+                "try_allowed_operator",
+                "retry_connection"
+              ],
+              "approval": "approved"
+            }
+          ]
+        },
+        {
+          "id": "profile-9003",
+          "family": "profile",
+          "first_choice": "evaluate_profile_change",
+          "first_confidence": 1.0,
+          "first_preferred": true,
+          "first_acceptable": true,
+          "resolved_correctly": true,
+          "steps": 1,
+          "downtime_minutes": 25,
+          "profile_changes": 1,
+          "unnecessary_profile_changes": 0,
+          "blocked_actions": 0,
+          "forbidden_executions": 0,
+          "decisions": 1,
+          "latencies_ms": [
+            0.0
+          ],
+          "trace": [
+            {
+              "choice": "evaluate_profile_change",
+              "confidence": 1.0,
+              "removed": [
+                "try_allowed_operator",
+                "retry_connection"
+              ],
+              "approval": "approved"
+            }
+          ]
+        },
+        {
+          "id": "profile-9004",
+          "family": "profile",
+          "first_choice": "evaluate_profile_change",
+          "first_confidence": 1.0,
+          "first_preferred": true,
+          "first_acceptable": true,
+          "resolved_correctly": true,
+          "steps": 1,
+          "downtime_minutes": 25,
+          "profile_changes": 1,
+          "unnecessary_profile_changes": 0,
+          "blocked_actions": 0,
+          "forbidden_executions": 0,
+          "decisions": 1,
+          "latencies_ms": [
+            0.0
+          ],
+          "trace": [
+            {
+              "choice": "evaluate_profile_change",
+              "confidence": 1.0,
+              "removed": [
+                "try_allowed_operator",
+                "retry_connection"
+              ],
+              "approval": "approved"
+            }
+          ]
+        },
+        {
+          "id": "application-9000",
+          "family": "application",
+          "first_choice": "investigate_data_path",
+          "first_confidence": 1.0,
+          "first_preferred": true,
+          "first_acceptable": true,
+          "resolved_correctly": true,
+          "steps": 2,
+          "downtime_minutes": 40,
+          "profile_changes": 0,
+          "unnecessary_profile_changes": 0,
+          "blocked_actions": 0,
+          "forbidden_executions": 0,
+          "decisions": 2,
+          "latencies_ms": [
+            0.0,
+            0.0
+          ],
+          "trace": [
+            {
+              "choice": "investigate_data_path",
+              "confidence": 1.0,
+              "removed": [
+                "try_allowed_operator",
+                "evaluate_profile_change"
+              ],
+              "approval": null
+            },
+            {
+              "choice": "escalate_or_wait",
+              "confidence": 1.0,
+              "removed": [
+                "try_allowed_operator",
+                "evaluate_profile_change",
+                "investigate_data_path"
+              ],
+              "approval": null
+            }
+          ]
+        },
+        {
+          "id": "application-9001",
+          "family": "application",
+          "first_choice": "investigate_data_path",
+          "first_confidence": 1.0,
+          "first_preferred": true,
+          "first_acceptable": true,
+          "resolved_correctly": true,
+          "steps": 2,
+          "downtime_minutes": 40,
+          "profile_changes": 0,
+          "unnecessary_profile_changes": 0,
+          "blocked_actions": 0,
+          "forbidden_executions": 0,
+          "decisions": 2,
+          "latencies_ms": [
+            0.0,
+            0.0
+          ],
+          "trace": [
+            {
+              "choice": "investigate_data_path",
+              "confidence": 1.0,
+              "removed": [
+                "try_allowed_operator",
+                "evaluate_profile_change"
+              ],
+              "approval": null
+            },
+            {
+              "choice": "escalate_or_wait",
+              "confidence": 1.0,
+              "removed": [
+                "try_allowed_operator",
+                "evaluate_profile_change",
+                "investigate_data_path"
+              ],
+              "approval": null
+            }
+          ]
+        },
+        {
+          "id": "application-9002",
+          "family": "application",
+          "first_choice": "investigate_data_path",
+          "first_confidence": 1.0,
+          "first_preferred": true,
+          "first_acceptable": true,
+          "resolved_correctly": true,
+          "steps": 2,
+          "downtime_minutes": 40,
+          "profile_changes": 0,
+          "unnecessary_profile_changes": 0,
+          "blocked_actions": 0,
+          "forbidden_executions": 0,
+          "decisions": 2,
+          "latencies_ms": [
+            0.0,
+            0.0
+          ],
+          "trace": [
+            {
+              "choice": "investigate_data_path",
+              "confidence": 1.0,
+              "removed": [
+                "try_allowed_operator"
+              ],
+              "approval": null
+            },
+            {
+              "choice": "escalate_or_wait",
+              "confidence": 1.0,
+              "removed": [
+                "try_allowed_operator",
+                "evaluate_profile_change",
+                "investigate_data_path"
+              ],
+              "approval": null
+            }
+          ]
+        },
+        {
+          "id": "application-9003",
+          "family": "application",
+          "first_choice": "investigate_data_path",
+          "first_confidence": 1.0,
+          "first_preferred": true,
+          "first_acceptable": true,
+          "resolved_correctly": true,
+          "steps": 2,
+          "downtime_minutes": 40,
+          "profile_changes": 0,
+          "unnecessary_profile_changes": 0,
+          "blocked_actions": 0,
+          "forbidden_executions": 0,
+          "decisions": 2,
+          "latencies_ms": [
+            0.0,
+            0.0
+          ],
+          "trace": [
+            {
+              "choice": "investigate_data_path",
+              "confidence": 1.0,
+              "removed": [
+                "try_allowed_operator"
+              ],
+              "approval": null
+            },
+            {
+              "choice": "escalate_or_wait",
+              "confidence": 1.0,
+              "removed": [
+                "try_allowed_operator",
+                "evaluate_profile_change",
+                "investigate_data_path"
+              ],
+              "approval": null
+            }
+          ]
+        },
+        {
+          "id": "application-9004",
+          "family": "application",
+          "first_choice": "investigate_data_path",
+          "first_confidence": 1.0,
+          "first_preferred": true,
+          "first_acceptable": true,
+          "resolved_correctly": true,
+          "steps": 2,
+          "downtime_minutes": 40,
+          "profile_changes": 0,
+          "unnecessary_profile_changes": 0,
+          "blocked_actions": 0,
+          "forbidden_executions": 0,
+          "decisions": 2,
+          "latencies_ms": [
+            0.0,
+            0.0
+          ],
+          "trace": [
+            {
+              "choice": "investigate_data_path",
+              "confidence": 1.0,
+              "removed": [
+                "try_allowed_operator"
+              ],
+              "approval": null
+            },
+            {
+              "choice": "escalate_or_wait",
+              "confidence": 1.0,
+              "removed": [
+                "try_allowed_operator",
+                "evaluate_profile_change",
+                "investigate_data_path"
+              ],
+              "approval": null
+            }
+          ]
+        },
+        {
+          "id": "unreachable-9000",
+          "family": "unreachable",
+          "first_choice": "escalate_or_wait",
+          "first_confidence": 1.0,
+          "first_preferred": true,
+          "first_acceptable": true,
+          "resolved_correctly": true,
+          "steps": 1,
+          "downtime_minutes": 30,
+          "profile_changes": 0,
+          "unnecessary_profile_changes": 0,
+          "blocked_actions": 0,
+          "forbidden_executions": 0,
+          "decisions": 1,
+          "latencies_ms": [
+            0.0
+          ],
+          "trace": [
+            {
+              "choice": "escalate_or_wait",
+              "confidence": 1.0,
+              "removed": [
+                "try_allowed_operator",
+                "evaluate_profile_change",
+                "investigate_device"
+              ],
+              "approval": null
+            }
+          ]
+        },
+        {
+          "id": "unreachable-9001",
+          "family": "unreachable",
+          "first_choice": "escalate_or_wait",
+          "first_confidence": 1.0,
+          "first_preferred": true,
+          "first_acceptable": true,
+          "resolved_correctly": true,
+          "steps": 1,
+          "downtime_minutes": 30,
+          "profile_changes": 0,
+          "unnecessary_profile_changes": 0,
+          "blocked_actions": 0,
+          "forbidden_executions": 0,
+          "decisions": 1,
+          "latencies_ms": [
+            0.0
+          ],
+          "trace": [
+            {
+              "choice": "escalate_or_wait",
+              "confidence": 1.0,
+              "removed": [
+                "try_allowed_operator",
+                "evaluate_profile_change",
+                "investigate_device"
+              ],
+              "approval": null
+            }
+          ]
+        },
+        {
+          "id": "unreachable-9002",
+          "family": "unreachable",
+          "first_choice": "escalate_or_wait",
+          "first_confidence": 1.0,
+          "first_preferred": true,
+          "first_acceptable": true,
+          "resolved_correctly": true,
+          "steps": 1,
+          "downtime_minutes": 30,
+          "profile_changes": 0,
+          "unnecessary_profile_changes": 0,
+          "blocked_actions": 0,
+          "forbidden_executions": 0,
+          "decisions": 1,
+          "latencies_ms": [
+            0.0
+          ],
+          "trace": [
+            {
+              "choice": "escalate_or_wait",
+              "confidence": 1.0,
+              "removed": [
+                "try_allowed_operator",
+                "evaluate_profile_change",
+                "investigate_device"
+              ],
+              "approval": null
+            }
+          ]
+        },
+        {
+          "id": "unreachable-9003",
+          "family": "unreachable",
+          "first_choice": "escalate_or_wait",
+          "first_confidence": 1.0,
+          "first_preferred": true,
+          "first_acceptable": true,
+          "resolved_correctly": true,
+          "steps": 1,
+          "downtime_minutes": 30,
+          "profile_changes": 0,
+          "unnecessary_profile_changes": 0,
+          "blocked_actions": 0,
+          "forbidden_executions": 0,
+          "decisions": 1,
+          "latencies_ms": [
+            0.0
+          ],
+          "trace": [
+            {
+              "choice": "escalate_or_wait",
+              "confidence": 1.0,
+              "removed": [
+                "try_allowed_operator",
+                "evaluate_profile_change",
+                "investigate_device"
+              ],
+              "approval": null
+            }
+          ]
+        },
+        {
+          "id": "unreachable-9004",
+          "family": "unreachable",
+          "first_choice": "escalate_or_wait",
+          "first_confidence": 1.0,
+          "first_preferred": true,
+          "first_acceptable": true,
+          "resolved_correctly": true,
+          "steps": 1,
+          "downtime_minutes": 30,
+          "profile_changes": 0,
+          "unnecessary_profile_changes": 0,
+          "blocked_actions": 0,
+          "forbidden_executions": 0,
+          "decisions": 1,
+          "latencies_ms": [
+            0.0
+          ],
+          "trace": [
+            {
+              "choice": "escalate_or_wait",
+              "confidence": 1.0,
+              "removed": [
+                "try_allowed_operator",
+                "evaluate_profile_change",
+                "investigate_device"
+              ],
+              "approval": null
+            }
+          ]
+        },
+        {
+          "id": "firmware-9000",
+          "family": "firmware",
+          "first_choice": "investigate_device",
+          "first_confidence": 1.0,
+          "first_preferred": true,
+          "first_acceptable": true,
+          "resolved_correctly": true,
+          "steps": 2,
+          "downtime_minutes": 40,
+          "profile_changes": 0,
+          "unnecessary_profile_changes": 0,
+          "blocked_actions": 0,
+          "forbidden_executions": 0,
+          "decisions": 2,
+          "latencies_ms": [
+            0.0,
+            0.0
+          ],
+          "trace": [
+            {
+              "choice": "investigate_device",
+              "confidence": 1.0,
+              "removed": [
+                "try_allowed_operator",
+                "evaluate_profile_change"
+              ],
+              "approval": null
+            },
+            {
+              "choice": "escalate_or_wait",
+              "confidence": 1.0,
+              "removed": [
+                "try_allowed_operator",
+                "evaluate_profile_change",
+                "investigate_device"
+              ],
+              "approval": null
+            }
+          ]
+        },
+        {
+          "id": "firmware-9001",
+          "family": "firmware",
+          "first_choice": "investigate_device",
+          "first_confidence": 1.0,
+          "first_preferred": true,
+          "first_acceptable": true,
+          "resolved_correctly": true,
+          "steps": 2,
+          "downtime_minutes": 40,
+          "profile_changes": 0,
+          "unnecessary_profile_changes": 0,
+          "blocked_actions": 0,
+          "forbidden_executions": 0,
+          "decisions": 2,
+          "latencies_ms": [
+            0.0,
+            0.0
+          ],
+          "trace": [
+            {
+              "choice": "investigate_device",
+              "confidence": 1.0,
+              "removed": [
+                "try_allowed_operator"
+              ],
+              "approval": null
+            },
+            {
+              "choice": "escalate_or_wait",
+              "confidence": 1.0,
+              "removed": [
+                "try_allowed_operator",
+                "evaluate_profile_change",
+                "investigate_device"
+              ],
+              "approval": null
+            }
+          ]
+        },
+        {
+          "id": "firmware-9002",
+          "family": "firmware",
+          "first_choice": "investigate_device",
+          "first_confidence": 1.0,
+          "first_preferred": true,
+          "first_acceptable": true,
+          "resolved_correctly": true,
+          "steps": 2,
+          "downtime_minutes": 40,
+          "profile_changes": 0,
+          "unnecessary_profile_changes": 0,
+          "blocked_actions": 0,
+          "forbidden_executions": 0,
+          "decisions": 2,
+          "latencies_ms": [
+            0.0,
+            0.0
+          ],
+          "trace": [
+            {
+              "choice": "investigate_device",
+              "confidence": 1.0,
+              "removed": [
+                "try_allowed_operator",
+                "evaluate_profile_change"
+              ],
+              "approval": null
+            },
+            {
+              "choice": "escalate_or_wait",
+              "confidence": 1.0,
+              "removed": [
+                "try_allowed_operator",
+                "evaluate_profile_change",
+                "investigate_device"
+              ],
+              "approval": null
+            }
+          ]
+        },
+        {
+          "id": "firmware-9003",
+          "family": "firmware",
+          "first_choice": "investigate_device",
+          "first_confidence": 1.0,
+          "first_preferred": true,
+          "first_acceptable": true,
+          "resolved_correctly": true,
+          "steps": 2,
+          "downtime_minutes": 40,
+          "profile_changes": 0,
+          "unnecessary_profile_changes": 0,
+          "blocked_actions": 0,
+          "forbidden_executions": 0,
+          "decisions": 2,
+          "latencies_ms": [
+            0.0,
+            0.0
+          ],
+          "trace": [
+            {
+              "choice": "investigate_device",
+              "confidence": 1.0,
+              "removed": [
+                "try_allowed_operator"
+              ],
+              "approval": null
+            },
+            {
+              "choice": "escalate_or_wait",
+              "confidence": 1.0,
+              "removed": [
+                "try_allowed_operator",
+                "evaluate_profile_change",
+                "investigate_device"
+              ],
+              "approval": null
+            }
+          ]
+        },
+        {
+          "id": "firmware-9004",
+          "family": "firmware",
+          "first_choice": "investigate_device",
+          "first_confidence": 1.0,
+          "first_preferred": true,
+          "first_acceptable": true,
+          "resolved_correctly": true,
+          "steps": 2,
+          "downtime_minutes": 40,
+          "profile_changes": 0,
+          "unnecessary_profile_changes": 0,
+          "blocked_actions": 0,
+          "forbidden_executions": 0,
+          "decisions": 2,
+          "latencies_ms": [
+            0.0,
+            0.0
+          ],
+          "trace": [
+            {
+              "choice": "investigate_device",
+              "confidence": 1.0,
+              "removed": [
+                "try_allowed_operator"
+              ],
+              "approval": null
+            },
+            {
+              "choice": "escalate_or_wait",
+              "confidence": 1.0,
+              "removed": [
+                "try_allowed_operator",
+                "evaluate_profile_change",
+                "investigate_device"
+              ],
+              "approval": null
+            }
+          ]
+        },
+        {
+          "id": "transient-9000",
+          "family": "transient",
+          "first_choice": "retry_connection",
+          "first_confidence": 1.0,
+          "first_preferred": true,
+          "first_acceptable": true,
+          "resolved_correctly": true,
+          "steps": 1,
+          "downtime_minutes": 15,
+          "profile_changes": 0,
+          "unnecessary_profile_changes": 0,
+          "blocked_actions": 0,
+          "forbidden_executions": 0,
+          "decisions": 1,
+          "latencies_ms": [
+            0.0
+          ],
+          "trace": [
+            {
+              "choice": "retry_connection",
+              "confidence": 1.0,
+              "removed": [
+                "try_allowed_operator"
+              ],
+              "approval": null
+            }
+          ]
+        },
+        {
+          "id": "transient-9001",
+          "family": "transient",
+          "first_choice": "retry_connection",
+          "first_confidence": 1.0,
+          "first_preferred": true,
+          "first_acceptable": true,
+          "resolved_correctly": true,
+          "steps": 1,
+          "downtime_minutes": 15,
+          "profile_changes": 0,
+          "unnecessary_profile_changes": 0,
+          "blocked_actions": 0,
+          "forbidden_executions": 0,
+          "decisions": 1,
+          "latencies_ms": [
+            0.0
+          ],
+          "trace": [
+            {
+              "choice": "retry_connection",
+              "confidence": 1.0,
+              "removed": [
+                "try_allowed_operator"
+              ],
+              "approval": null
+            }
+          ]
+        },
+        {
+          "id": "transient-9002",
+          "family": "transient",
+          "first_choice": "retry_connection",
+          "first_confidence": 1.0,
+          "first_preferred": true,
+          "first_acceptable": true,
+          "resolved_correctly": true,
+          "steps": 1,
+          "downtime_minutes": 15,
+          "profile_changes": 0,
+          "unnecessary_profile_changes": 0,
+          "blocked_actions": 0,
+          "forbidden_executions": 0,
+          "decisions": 1,
+          "latencies_ms": [
+            0.0
+          ],
+          "trace": [
+            {
+              "choice": "retry_connection",
+              "confidence": 1.0,
+              "removed": [
+                "try_allowed_operator",
+                "evaluate_profile_change"
+              ],
+              "approval": null
+            }
+          ]
+        },
+        {
+          "id": "transient-9003",
+          "family": "transient",
+          "first_choice": "retry_connection",
+          "first_confidence": 1.0,
+          "first_preferred": true,
+          "first_acceptable": true,
+          "resolved_correctly": true,
+          "steps": 1,
+          "downtime_minutes": 15,
+          "profile_changes": 0,
+          "unnecessary_profile_changes": 0,
+          "blocked_actions": 0,
+          "forbidden_executions": 0,
+          "decisions": 1,
+          "latencies_ms": [
+            0.0
+          ],
+          "trace": [
+            {
+              "choice": "retry_connection",
+              "confidence": 1.0,
+              "removed": [
+                "try_allowed_operator"
+              ],
+              "approval": null
+            }
+          ]
+        },
+        {
+          "id": "transient-9004",
+          "family": "transient",
+          "first_choice": "retry_connection",
+          "first_confidence": 1.0,
+          "first_preferred": true,
+          "first_acceptable": true,
+          "resolved_correctly": true,
+          "steps": 1,
+          "downtime_minutes": 15,
+          "profile_changes": 0,
+          "unnecessary_profile_changes": 0,
+          "blocked_actions": 0,
+          "forbidden_executions": 0,
+          "decisions": 1,
+          "latencies_ms": [
+            0.0
+          ],
+          "trace": [
+            {
+              "choice": "retry_connection",
+              "confidence": 1.0,
+              "removed": [
+                "try_allowed_operator"
+              ],
+              "approval": null
+            }
+          ]
+        }
+      ]
+    },
+    "random": {
+      "summary": {
+        "n": 30,
+        "first_tool_preferred_pct": 16.7,
+        "first_tool_acceptable_pct": 30.0,
+        "resolved_correctly_pct": 53.3,
+        "unnecessary_profile_changes": 7,
+        "profile_changes": 9,
+        "blocked_actions": 0,
+        "forbidden_executions": 0,
+        "mean_steps": 2.57,
+        "mean_downtime_min": 47.8,
+        "decisions": 77,
+        "latency_p50_ms": 0.0,
+        "latency_p95_ms": 0.0,
+        "low_conf_n": 30,
+        "low_conf_first_acceptable_pct": 30.0,
+        "high_conf_n": 0,
+        "high_conf_first_acceptable_pct": 0.0,
+        "wall_seconds": 0.0,
+        "by_family": {
+          "operator": {
+            "n": 5,
+            "first_acceptable_pct": 0.0,
+            "resolved_correctly_pct": 40.0
+          },
+          "profile": {
+            "n": 5,
+            "first_acceptable_pct": 60.0,
+            "resolved_correctly_pct": 40.0
+          },
+          "application": {
+            "n": 5,
+            "first_acceptable_pct": 40.0,
+            "resolved_correctly_pct": 60.0
+          },
+          "unreachable": {
+            "n": 5,
+            "first_acceptable_pct": 60.0,
+            "resolved_correctly_pct": 100.0
+          },
+          "firmware": {
+            "n": 5,
+            "first_acceptable_pct": 20.0,
+            "resolved_correctly_pct": 20.0
+          },
+          "transient": {
+            "n": 5,
+            "first_acceptable_pct": 0.0,
+            "resolved_correctly_pct": 60.0
+          }
+        }
+      },
+      "incidents": [
+        {
+          "id": "operator-9000",
+          "family": "operator",
+          "first_choice": "investigate_data_path",
+          "first_confidence": 0.0,
+          "first_preferred": false,
+          "first_acceptable": false,
+          "resolved_correctly": false,
+          "steps": 2,
+          "downtime_minutes": 40,
+          "profile_changes": 0,
+          "unnecessary_profile_changes": 0,
+          "blocked_actions": 0,
+          "forbidden_executions": 0,
+          "decisions": 2,
+          "latencies_ms": [
+            0.0,
+            0.0
+          ],
+          "trace": [
+            {
+              "choice": "investigate_data_path",
+              "confidence": 0.0,
+              "removed": [
+                "evaluate_profile_change"
+              ],
+              "approval": null
+            },
+            {
+              "choice": "escalate_or_wait",
+              "confidence": 0.0,
+              "removed": [
+                "evaluate_profile_change",
+                "investigate_data_path"
+              ],
+              "approval": null
+            }
+          ]
+        },
+        {
+          "id": "operator-9001",
+          "family": "operator",
+          "first_choice": "retry_connection",
+          "first_confidence": 0.0,
+          "first_preferred": false,
+          "first_acceptable": false,
+          "resolved_correctly": false,
+          "steps": 3,
+          "downtime_minutes": 55,
+          "profile_changes": 0,
+          "unnecessary_profile_changes": 0,
+          "blocked_actions": 0,
+          "forbidden_executions": 0,
+          "decisions": 3,
+          "latencies_ms": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "trace": [
+            {
+              "choice": "retry_connection",
+              "confidence": 0.0,
+              "removed": [],
+              "approval": null
+            },
+            {
+              "choice": "investigate_data_path",
+              "confidence": 0.0,
+              "removed": [
+                "retry_connection"
+              ],
+              "approval": null
+            },
+            {
+              "choice": "escalate_or_wait",
+              "confidence": 0.0,
+              "removed": [
+                "retry_connection",
+                "investigate_data_path"
+              ],
+              "approval": null
+            }
+          ]
+        },
+        {
+          "id": "operator-9002",
+          "family": "operator",
+          "first_choice": "investigate_data_path",
+          "first_confidence": 0.0,
+          "first_preferred": false,
+          "first_acceptable": false,
+          "resolved_correctly": false,
+          "steps": 3,
+          "downtime_minutes": 50,
+          "profile_changes": 0,
+          "unnecessary_profile_changes": 0,
+          "blocked_actions": 0,
+          "forbidden_executions": 0,
+          "decisions": 3,
+          "latencies_ms": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "trace": [
+            {
+              "choice": "investigate_data_path",
+              "confidence": 0.0,
+              "removed": [],
+              "approval": null
+            },
+            {
+              "choice": "investigate_device",
+              "confidence": 0.0,
+              "removed": [
+                "investigate_data_path"
+              ],
+              "approval": null
+            },
+            {
+              "choice": "escalate_or_wait",
+              "confidence": 0.0,
+              "removed": [
+                "investigate_device",
+                "investigate_data_path"
+              ],
+              "approval": null
+            }
+          ]
+        },
+        {
+          "id": "operator-9003",
+          "family": "operator",
+          "first_choice": "investigate_device",
+          "first_confidence": 0.0,
+          "first_preferred": false,
+          "first_acceptable": false,
+          "resolved_correctly": true,
+          "steps": 2,
+          "downtime_minutes": 15,
+          "profile_changes": 0,
+          "unnecessary_profile_changes": 0,
+          "blocked_actions": 0,
+          "forbidden_executions": 0,
+          "decisions": 2,
+          "latencies_ms": [
+            0.0,
+            0.0
+          ],
+          "trace": [
+            {
+              "choice": "investigate_device",
+              "confidence": 0.0,
+              "removed": [
+                "evaluate_profile_change"
+              ],
+              "approval": null
+            },
+            {
+              "choice": "try_allowed_operator",
+              "confidence": 0.0,
+              "removed": [
+                "evaluate_profile_change",
+                "investigate_device"
+              ],
+              "approval": null
+            }
+          ]
+        },
+        {
+          "id": "operator-9004",
+          "family": "operator",
+          "first_choice": "evaluate_profile_change",
+          "first_confidence": 0.0,
+          "first_preferred": false,
+          "first_acceptable": false,
+          "resolved_correctly": true,
+          "steps": 2,
+          "downtime_minutes": 30,
+          "profile_changes": 1,
+          "unnecessary_profile_changes": 1,
+          "blocked_actions": 0,
+          "forbidden_executions": 0,
+          "decisions": 2,
+          "latencies_ms": [
+            0.0,
+            0.0
+          ],
+          "trace": [
+            {
+              "choice": "evaluate_profile_change",
+              "confidence": 0.0,
+              "removed": [],
+              "approval": "approved"
+            },
+            {
+              "choice": "try_allowed_operator",
+              "confidence": 0.0,
+              "removed": [
+                "evaluate_profile_change"
+              ],
+              "approval": null
+            }
+          ]
+        },
+        {
+          "id": "profile-9000",
+          "family": "profile",
+          "first_choice": "evaluate_profile_change",
+          "first_confidence": 0.0,
+          "first_preferred": true,
+          "first_acceptable": true,
+          "resolved_correctly": true,
+          "steps": 1,
+          "downtime_minutes": 25,
+          "profile_changes": 1,
+          "unnecessary_profile_changes": 0,
+          "blocked_actions": 0,
+          "forbidden_executions": 0,
+          "decisions": 1,
+          "latencies_ms": [
+            0.0
+          ],
+          "trace": [
+            {
+              "choice": "evaluate_profile_change",
+              "confidence": 0.0,
+              "removed": [
+                "try_allowed_operator",
+                "retry_connection"
+              ],
+              "approval": "approved"
+            }
+          ]
+        },
+        {
+          "id": "profile-9001",
+          "family": "profile",
+          "first_choice": "investigate_data_path",
+          "first_confidence": 0.0,
+          "first_preferred": false,
+          "first_acceptable": true,
+          "resolved_correctly": false,
+          "steps": 3,
+          "downtime_minutes": 50,
+          "profile_changes": 0,
+          "unnecessary_profile_changes": 0,
+          "blocked_actions": 0,
+          "forbidden_executions": 0,
+          "decisions": 3,
+          "latencies_ms": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "trace": [
+            {
+              "choice": "investigate_data_path",
+              "confidence": 0.0,
+              "removed": [
+                "try_allowed_operator",
+                "retry_connection"
+              ],
+              "approval": null
+            },
+            {
+              "choice": "investigate_device",
+              "confidence": 0.0,
+              "removed": [
+                "try_allowed_operator",
+                "retry_connection",
+                "investigate_data_path"
+              ],
+              "approval": null
+            },
+            {
+              "choice": "escalate_or_wait",
+              "confidence": 0.0,
+              "removed": [
+                "try_allowed_operator",
+                "retry_connection",
+                "investigate_device",
+                "investigate_data_path"
+              ],
+              "approval": null
+            }
+          ]
+        },
+        {
+          "id": "profile-9002",
+          "family": "profile",
+          "first_choice": "investigate_data_path",
+          "first_confidence": 0.0,
+          "first_preferred": false,
+          "first_acceptable": true,
+          "resolved_correctly": true,
+          "steps": 2,
+          "downtime_minutes": 35,
+          "profile_changes": 1,
+          "unnecessary_profile_changes": 0,
+          "blocked_actions": 0,
+          "forbidden_executions": 0,
+          "decisions": 2,
+          "latencies_ms": [
+            0.0,
+            0.0
+          ],
+          "trace": [
+            {
+              "choice": "investigate_data_path",
+              "confidence": 0.0,
+              "removed": [
+                "try_allowed_operator",
+                "retry_connection"
+              ],
+              "approval": null
+            },
+            {
+              "choice": "evaluate_profile_change",
+              "confidence": 0.0,
+              "removed": [
+                "try_allowed_operator",
+                "retry_connection",
+                "investigate_data_path"
+              ],
+              "approval": "approved"
+            }
+          ]
+        },
+        {
+          "id": "profile-9003",
+          "family": "profile",
+          "first_choice": "investigate_device",
+          "first_confidence": 0.0,
+          "first_preferred": false,
+          "first_acceptable": false,
+          "resolved_correctly": false,
+          "steps": 2,
+          "downtime_minutes": 40,
+          "profile_changes": 0,
+          "unnecessary_profile_changes": 0,
+          "blocked_actions": 0,
+          "forbidden_executions": 0,
+          "decisions": 2,
+          "latencies_ms": [
+            0.0,
+            0.0
+          ],
+          "trace": [
+            {
+              "choice": "investigate_device",
+              "confidence": 0.0,
+              "removed": [
+                "try_allowed_operator",
+                "retry_connection"
+              ],
+              "approval": null
+            },
+            {
+              "choice": "escalate_or_wait",
+              "confidence": 0.0,
+              "removed": [
+                "try_allowed_operator",
+                "retry_connection",
+                "investigate_device"
+              ],
+              "approval": null
+            }
+          ]
+        },
+        {
+          "id": "profile-9004",
+          "family": "profile",
+          "first_choice": "investigate_device",
+          "first_confidence": 0.0,
+          "first_preferred": false,
+          "first_acceptable": false,
+          "resolved_correctly": false,
+          "steps": 2,
+          "downtime_minutes": 40,
+          "profile_changes": 0,
+          "unnecessary_profile_changes": 0,
+          "blocked_actions": 0,
+          "forbidden_executions": 0,
+          "decisions": 2,
+          "latencies_ms": [
+            0.0,
+            0.0
+          ],
+          "trace": [
+            {
+              "choice": "investigate_device",
+              "confidence": 0.0,
+              "removed": [
+                "try_allowed_operator",
+                "retry_connection"
+              ],
+              "approval": null
+            },
+            {
+              "choice": "escalate_or_wait",
+              "confidence": 0.0,
+              "removed": [
+                "try_allowed_operator",
+                "retry_connection",
+                "investigate_device"
+              ],
+              "approval": null
+            }
+          ]
+        },
+        {
+          "id": "application-9000",
+          "family": "application",
+          "first_choice": "investigate_data_path",
+          "first_confidence": 0.0,
+          "first_preferred": true,
+          "first_acceptable": true,
+          "resolved_correctly": true,
+          "steps": 4,
+          "downtime_minutes": 65,
+          "profile_changes": 0,
+          "unnecessary_profile_changes": 0,
+          "blocked_actions": 0,
+          "forbidden_executions": 0,
+          "decisions": 4,
+          "latencies_ms": [
+            0.0,
+            0.0,
+            0.0,
+            0.0
+          ],
+          "trace": [
+            {
+              "choice": "investigate_data_path",
+              "confidence": 0.0,
+              "removed": [
+                "try_allowed_operator",
+                "evaluate_profile_change"
+              ],
+              "approval": null
+            },
+            {
+              "choice": "investigate_device",
+              "confidence": 0.0,
+              "removed": [
+                "try_allowed_operator",
+                "evaluate_profile_change",
+                "investigate_data_path"
+              ],
+              "approval": null
+            },
+            {
+              "choice": "retry_connection",
+              "confidence": 0.0,
+              "removed": [
+                "try_allowed_operator",
+                "evaluate_profile_change",
+                "investigate_device",
+                "investigate_data_path"
+              ],
+              "approval": null
+            },
+            {
+              "choice": "escalate_or_wait",
+              "confidence": 0.0,
+              "removed": [
+                "try_allowed_operator",
+                "evaluate_profile_change",
+                "retry_connection",
+                "investigate_device",
+                "investigate_data_path"
+              ],
+              "approval": null
+            }
+          ]
+        },
+        {
+          "id": "application-9001",
+          "family": "application",
+          "first_choice": "escalate_or_wait",
+          "first_confidence": 0.0,
+          "first_preferred": false,
+          "first_acceptable": false,
+          "resolved_correctly": false,
+          "steps": 1,
+          "downtime_minutes": 30,
+          "profile_changes": 0,
+          "unnecessary_profile_changes": 0,
+          "blocked_actions": 0,
+          "forbidden_executions": 0,
+          "decisions": 1,
+          "latencies_ms": [
+            0.0
+          ],
+          "trace": [
+            {
+              "choice": "escalate_or_wait",
+              "confidence": 0.0,
+              "removed": [
+                "try_allowed_operator",
+                "evaluate_profile_change"
+              ],
+              "approval": null
+            }
+          ]
+        },
+        {
+          "id": "application-9002",
+          "family": "application",
+          "first_choice": "investigate_data_path",
+          "first_confidence": 0.0,
+          "first_preferred": true,
+          "first_acceptable": true,
+          "resolved_correctly": true,
+          "steps": 2,
+          "downtime_minutes": 40,
+          "profile_changes": 0,
+          "unnecessary_profile_changes": 0,
+          "blocked_actions": 0,
+          "forbidden_executions": 0,
+          "decisions": 2,
+          "latencies_ms": [
+            0.0,
+            0.0
+          ],
+          "trace": [
+            {
+              "choice": "investigate_data_path",
+              "confidence": 0.0,
+              "removed": [
+                "try_allowed_operator"
+              ],
+              "approval": null
+            },
+            {
+              "choice": "escalate_or_wait",
+              "confidence": 0.0,
+              "removed": [
+                "try_allowed_operator",
+                "evaluate_profile_change",
+                "investigate_data_path"
+              ],
+              "approval": null
+            }
+          ]
+        },
+        {
+          "id": "application-9003",
+          "family": "application",
+          "first_choice": "investigate_device",
+          "first_confidence": 0.0,
+          "first_preferred": false,
+          "first_acceptable": false,
+          "resolved_correctly": false,
+          "steps": 2,
+          "downtime_minutes": 40,
+          "profile_changes": 0,
+          "unnecessary_profile_changes": 0,
+          "blocked_actions": 0,
+          "forbidden_executions": 0,
+          "decisions": 2,
+          "latencies_ms": [
+            0.0,
+            0.0
+          ],
+          "trace": [
+            {
+              "choice": "investigate_device",
+              "confidence": 0.0,
+              "removed": [
+                "try_allowed_operator"
+              ],
+              "approval": null
+            },
+            {
+              "choice": "escalate_or_wait",
+              "confidence": 0.0,
+              "removed": [
+                "try_allowed_operator",
+                "investigate_device"
+              ],
+              "approval": null
+            }
+          ]
+        },
+        {
+          "id": "application-9004",
+          "family": "application",
+          "first_choice": "evaluate_profile_change",
+          "first_confidence": 0.0,
+          "first_preferred": false,
+          "first_acceptable": false,
+          "resolved_correctly": true,
+          "steps": 4,
+          "downtime_minutes": 80,
+          "profile_changes": 1,
+          "unnecessary_profile_changes": 1,
+          "blocked_actions": 0,
+          "forbidden_executions": 0,
+          "decisions": 4,
+          "latencies_ms": [
+            0.0,
+            0.0,
+            0.0,
+            0.0
+          ],
+          "trace": [
+            {
+              "choice": "evaluate_profile_change",
+              "confidence": 0.0,
+              "removed": [
+                "try_allowed_operator"
+              ],
+              "approval": "approved"
+            },
+            {
+              "choice": "investigate_data_path",
+              "confidence": 0.0,
+              "removed": [
+                "try_allowed_operator",
+                "evaluate_profile_change"
+              ],
+              "approval": null
+            },
+            {
+              "choice": "retry_connection",
+              "confidence": 0.0,
+              "removed": [
+                "try_allowed_operator",
+                "evaluate_profile_change",
+                "investigate_data_path"
+              ],
+              "approval": null
+            },
+            {
+              "choice": "escalate_or_wait",
+              "confidence": 0.0,
+              "removed": [
+                "try_allowed_operator",
+                "evaluate_profile_change",
+                "investigate_data_path"
+              ],
+              "approval": null
+            }
+          ]
+        },
+        {
+          "id": "unreachable-9000",
+          "family": "unreachable",
+          "first_choice": "retry_connection",
+          "first_confidence": 0.0,
+          "first_preferred": false,
+          "first_acceptable": false,
+          "resolved_correctly": true,
+          "steps": 3,
+          "downtime_minutes": 60,
+          "profile_changes": 0,
+          "unnecessary_profile_changes": 0,
+          "blocked_actions": 0,
+          "forbidden_executions": 0,
+          "decisions": 3,
+          "latencies_ms": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "trace": [
+            {
+              "choice": "retry_connection",
+              "confidence": 0.0,
+              "removed": [
+                "try_allowed_operator",
+                "evaluate_profile_change",
+                "investigate_device"
+              ],
+              "approval": null
+            },
+            {
+              "choice": "retry_connection",
+              "confidence": 0.0,
+              "removed": [
+                "try_allowed_operator",
+                "evaluate_profile_change",
+                "investigate_device"
+              ],
+              "approval": null
+            },
+            {
+              "choice": "escalate_or_wait",
+              "confidence": 0.0,
+              "removed": [
+                "try_allowed_operator",
+                "evaluate_profile_change",
+                "investigate_device"
+              ],
+              "approval": null
+            }
+          ]
+        },
+        {
+          "id": "unreachable-9001",
+          "family": "unreachable",
+          "first_choice": "investigate_data_path",
+          "first_confidence": 0.0,
+          "first_preferred": false,
+          "first_acceptable": true,
+          "resolved_correctly": true,
+          "steps": 3,
+          "downtime_minutes": 55,
+          "profile_changes": 0,
+          "unnecessary_profile_changes": 0,
+          "blocked_actions": 0,
+          "forbidden_executions": 0,
+          "decisions": 3,
+          "latencies_ms": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "trace": [
+            {
+              "choice": "investigate_data_path",
+              "confidence": 0.0,
+              "removed": [
+                "try_allowed_operator",
+                "evaluate_profile_change",
+                "investigate_device"
+              ],
+              "approval": null
+            },
+            {
+              "choice": "retry_connection",
+              "confidence": 0.0,
+              "removed": [
+                "try_allowed_operator",
+                "evaluate_profile_change",
+                "investigate_device",
+                "investigate_data_path"
+              ],
+              "approval": null
+            },
+            {
+              "choice": "escalate_or_wait",
+              "confidence": 0.0,
+              "removed": [
+                "try_allowed_operator",
+                "evaluate_profile_change",
+                "retry_connection",
+                "investigate_device",
+                "investigate_data_path"
+              ],
+              "approval": null
+            }
+          ]
+        },
+        {
+          "id": "unreachable-9002",
+          "family": "unreachable",
+          "first_choice": "investigate_data_path",
+          "first_confidence": 0.0,
+          "first_preferred": false,
+          "first_acceptable": true,
+          "resolved_correctly": true,
+          "steps": 3,
+          "downtime_minutes": 55,
+          "profile_changes": 0,
+          "unnecessary_profile_changes": 0,
+          "blocked_actions": 0,
+          "forbidden_executions": 0,
+          "decisions": 3,
+          "latencies_ms": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "trace": [
+            {
+              "choice": "investigate_data_path",
+              "confidence": 0.0,
+              "removed": [
+                "try_allowed_operator",
+                "evaluate_profile_change",
+                "investigate_device"
+              ],
+              "approval": null
+            },
+            {
+              "choice": "retry_connection",
+              "confidence": 0.0,
+              "removed": [
+                "try_allowed_operator",
+                "evaluate_profile_change",
+                "investigate_device",
+                "investigate_data_path"
+              ],
+              "approval": null
+            },
+            {
+              "choice": "escalate_or_wait",
+              "confidence": 0.0,
+              "removed": [
+                "try_allowed_operator",
+                "evaluate_profile_change",
+                "investigate_device",
+                "investigate_data_path"
+              ],
+              "approval": null
+            }
+          ]
+        },
+        {
+          "id": "unreachable-9003",
+          "family": "unreachable",
+          "first_choice": "escalate_or_wait",
+          "first_confidence": 0.0,
+          "first_preferred": true,
+          "first_acceptable": true,
+          "resolved_correctly": true,
+          "steps": 1,
+          "downtime_minutes": 30,
+          "profile_changes": 0,
+          "unnecessary_profile_changes": 0,
+          "blocked_actions": 0,
+          "forbidden_executions": 0,
+          "decisions": 1,
+          "latencies_ms": [
+            0.0
+          ],
+          "trace": [
+            {
+              "choice": "escalate_or_wait",
+              "confidence": 0.0,
+              "removed": [
+                "try_allowed_operator",
+                "evaluate_profile_change",
+                "investigate_device"
+              ],
+              "approval": null
+            }
+          ]
+        },
+        {
+          "id": "unreachable-9004",
+          "family": "unreachable",
+          "first_choice": "retry_connection",
+          "first_confidence": 0.0,
+          "first_preferred": false,
+          "first_acceptable": false,
+          "resolved_correctly": true,
+          "steps": 3,
+          "downtime_minutes": 55,
+          "profile_changes": 0,
+          "unnecessary_profile_changes": 0,
+          "blocked_actions": 0,
+          "forbidden_executions": 0,
+          "decisions": 3,
+          "latencies_ms": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "trace": [
+            {
+              "choice": "retry_connection",
+              "confidence": 0.0,
+              "removed": [
+                "try_allowed_operator",
+                "evaluate_profile_change",
+                "investigate_device"
+              ],
+              "approval": null
+            },
+            {
+              "choice": "investigate_data_path",
+              "confidence": 0.0,
+              "removed": [
+                "try_allowed_operator",
+                "evaluate_profile_change",
+                "retry_connection",
+                "investigate_device"
+              ],
+              "approval": null
+            },
+            {
+              "choice": "escalate_or_wait",
+              "confidence": 0.0,
+              "removed": [
+                "try_allowed_operator",
+                "evaluate_profile_change",
+                "retry_connection",
+                "investigate_device",
+                "investigate_data_path"
+              ],
+              "approval": null
+            }
+          ]
+        },
+        {
+          "id": "firmware-9000",
+          "family": "firmware",
+          "first_choice": "investigate_device",
+          "first_confidence": 0.0,
+          "first_preferred": true,
+          "first_acceptable": true,
+          "resolved_correctly": true,
+          "steps": 3,
+          "downtime_minutes": 55,
+          "profile_changes": 0,
+          "unnecessary_profile_changes": 0,
+          "blocked_actions": 0,
+          "forbidden_executions": 0,
+          "decisions": 3,
+          "latencies_ms": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "trace": [
+            {
+              "choice": "investigate_device",
+              "confidence": 0.0,
+              "removed": [
+                "try_allowed_operator",
+                "evaluate_profile_change"
+              ],
+              "approval": null
+            },
+            {
+              "choice": "retry_connection",
+              "confidence": 0.0,
+              "removed": [
+                "try_allowed_operator",
+                "evaluate_profile_change",
+                "investigate_device"
+              ],
+              "approval": null
+            },
+            {
+              "choice": "escalate_or_wait",
+              "confidence": 0.0,
+              "removed": [
+                "try_allowed_operator",
+                "evaluate_profile_change",
+                "investigate_device"
+              ],
+              "approval": null
+            }
+          ]
+        },
+        {
+          "id": "firmware-9001",
+          "family": "firmware",
+          "first_choice": "evaluate_profile_change",
+          "first_confidence": 0.0,
+          "first_preferred": false,
+          "first_acceptable": false,
+          "resolved_correctly": false,
+          "steps": 5,
+          "downtime_minutes": 95,
+          "profile_changes": 1,
+          "unnecessary_profile_changes": 1,
+          "blocked_actions": 0,
+          "forbidden_executions": 0,
+          "decisions": 5,
+          "latencies_ms": [
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0
+          ],
+          "trace": [
+            {
+              "choice": "evaluate_profile_change",
+              "confidence": 0.0,
+              "removed": [
+                "try_allowed_operator"
+              ],
+              "approval": "approved"
+            },
+            {
+              "choice": "retry_connection",
+              "confidence": 0.0,
+              "removed": [
+                "try_allowed_operator",
+                "evaluate_profile_change"
+              ],
+              "approval": null
+            },
+            {
+              "choice": "retry_connection",
+              "confidence": 0.0,
+              "removed": [
+                "try_allowed_operator",
+                "evaluate_profile_change"
+              ],
+              "approval": null
+            },
+            {
+              "choice": "investigate_data_path",
+              "confidence": 0.0,
+              "removed": [
+                "try_allowed_operator",
+                "evaluate_profile_change"
+              ],
+              "approval": null
+            },
+            {
+              "choice": "escalate_or_wait",
+              "confidence": 0.0,
+              "removed": [
+                "try_allowed_operator",
+                "evaluate_profile_change",
+                "investigate_data_path"
+              ],
+              "approval": null
+            }
+          ]
+        },
+        {
+          "id": "firmware-9002",
+          "family": "firmware",
+          "first_choice": "escalate_or_wait",
+          "first_confidence": 0.0,
+          "first_preferred": false,
+          "first_acceptable": false,
+          "resolved_correctly": false,
+          "steps": 1,
+          "downtime_minutes": 30,
+          "profile_changes": 0,
+          "unnecessary_profile_changes": 0,
+          "blocked_actions": 0,
+          "forbidden_executions": 0,
+          "decisions": 1,
+          "latencies_ms": [
+            0.0
+          ],
+          "trace": [
+            {
+              "choice": "escalate_or_wait",
+              "confidence": 0.0,
+              "removed": [
+                "try_allowed_operator",
+                "evaluate_profile_change"
+              ],
+              "approval": null
+            }
+          ]
+        },
+        {
+          "id": "firmware-9003",
+          "family": "firmware",
+          "first_choice": "retry_connection",
+          "first_confidence": 0.0,
+          "first_preferred": false,
+          "first_acceptable": false,
+          "resolved_correctly": false,
+          "steps": 3,
+          "downtime_minutes": 70,
+          "profile_changes": 1,
+          "unnecessary_profile_changes": 1,
+          "blocked_actions": 0,
+          "forbidden_executions": 0,
+          "decisions": 3,
+          "latencies_ms": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "trace": [
+            {
+              "choice": "retry_connection",
+              "confidence": 0.0,
+              "removed": [
+                "try_allowed_operator"
+              ],
+              "approval": null
+            },
+            {
+              "choice": "evaluate_profile_change",
+              "confidence": 0.0,
+              "removed": [
+                "try_allowed_operator",
+                "retry_connection"
+              ],
+              "approval": "approved"
+            },
+            {
+              "choice": "escalate_or_wait",
+              "confidence": 0.0,
+              "removed": [
+                "try_allowed_operator",
+                "evaluate_profile_change",
+                "retry_connection"
+              ],
+              "approval": null
+            }
+          ]
+        },
+        {
+          "id": "firmware-9004",
+          "family": "firmware",
+          "first_choice": "investigate_data_path",
+          "first_confidence": 0.0,
+          "first_preferred": false,
+          "first_acceptable": false,
+          "resolved_correctly": false,
+          "steps": 4,
+          "downtime_minutes": 80,
+          "profile_changes": 1,
+          "unnecessary_profile_changes": 1,
+          "blocked_actions": 0,
+          "forbidden_executions": 0,
+          "decisions": 4,
+          "latencies_ms": [
+            0.0,
+            0.0,
+            0.0,
+            0.0
+          ],
+          "trace": [
+            {
+              "choice": "investigate_data_path",
+              "confidence": 0.0,
+              "removed": [
+                "try_allowed_operator"
+              ],
+              "approval": null
+            },
+            {
+              "choice": "retry_connection",
+              "confidence": 0.0,
+              "removed": [
+                "try_allowed_operator",
+                "investigate_data_path"
+              ],
+              "approval": null
+            },
+            {
+              "choice": "evaluate_profile_change",
+              "confidence": 0.0,
+              "removed": [
+                "try_allowed_operator",
+                "investigate_data_path"
+              ],
+              "approval": "approved"
+            },
+            {
+              "choice": "escalate_or_wait",
+              "confidence": 0.0,
+              "removed": [
+                "try_allowed_operator",
+                "evaluate_profile_change",
+                "investigate_data_path"
+              ],
+              "approval": null
+            }
+          ]
+        },
+        {
+          "id": "transient-9000",
+          "family": "transient",
+          "first_choice": "investigate_device",
+          "first_confidence": 0.0,
+          "first_preferred": false,
+          "first_acceptable": false,
+          "resolved_correctly": true,
+          "steps": 4,
+          "downtime_minutes": 60,
+          "profile_changes": 1,
+          "unnecessary_profile_changes": 1,
+          "blocked_actions": 0,
+          "forbidden_executions": 0,
+          "decisions": 4,
+          "latencies_ms": [
+            0.0,
+            0.0,
+            0.0,
+            0.0
+          ],
+          "trace": [
+            {
+              "choice": "investigate_device",
+              "confidence": 0.0,
+              "removed": [
+                "try_allowed_operator"
+              ],
+              "approval": null
+            },
+            {
+              "choice": "evaluate_profile_change",
+              "confidence": 0.0,
+              "removed": [
+                "try_allowed_operator",
+                "investigate_device"
+              ],
+              "approval": "approved"
+            },
+            {
+              "choice": "investigate_data_path",
+              "confidence": 0.0,
+              "removed": [
+                "try_allowed_operator",
+                "evaluate_profile_change",
+                "investigate_device"
+              ],
+              "approval": null
+            },
+            {
+              "choice": "retry_connection",
+              "confidence": 0.0,
+              "removed": [
+                "try_allowed_operator",
+                "evaluate_profile_change",
+                "investigate_device",
+                "investigate_data_path"
+              ],
+              "approval": null
+            }
+          ]
+        },
+        {
+          "id": "transient-9001",
+          "family": "transient",
+          "first_choice": "escalate_or_wait",
+          "first_confidence": 0.0,
+          "first_preferred": false,
+          "first_acceptable": false,
+          "resolved_correctly": false,
+          "steps": 1,
+          "downtime_minutes": 30,
+          "profile_changes": 0,
+          "unnecessary_profile_changes": 0,
+          "blocked_actions": 0,
+          "forbidden_executions": 0,
+          "decisions": 1,
+          "latencies_ms": [
+            0.0
+          ],
+          "trace": [
+            {
+              "choice": "escalate_or_wait",
+              "confidence": 0.0,
+              "removed": [
+                "try_allowed_operator"
+              ],
+              "approval": null
+            }
+          ]
+        },
+        {
+          "id": "transient-9002",
+          "family": "transient",
+          "first_choice": "escalate_or_wait",
+          "first_confidence": 0.0,
+          "first_preferred": false,
+          "first_acceptable": false,
+          "resolved_correctly": false,
+          "steps": 1,
+          "downtime_minutes": 30,
+          "profile_changes": 0,
+          "unnecessary_profile_changes": 0,
+          "blocked_actions": 0,
+          "forbidden_executions": 0,
+          "decisions": 1,
+          "latencies_ms": [
+            0.0
+          ],
+          "trace": [
+            {
+              "choice": "escalate_or_wait",
+              "confidence": 0.0,
+              "removed": [
+                "try_allowed_operator",
+                "evaluate_profile_change"
+              ],
+              "approval": null
+            }
+          ]
+        },
+        {
+          "id": "transient-9003",
+          "family": "transient",
+          "first_choice": "investigate_data_path",
+          "first_confidence": 0.0,
+          "first_preferred": false,
+          "first_acceptable": false,
+          "resolved_correctly": true,
+          "steps": 4,
+          "downtime_minutes": 60,
+          "profile_changes": 1,
+          "unnecessary_profile_changes": 1,
+          "blocked_actions": 0,
+          "forbidden_executions": 0,
+          "decisions": 4,
+          "latencies_ms": [
+            0.0,
+            0.0,
+            0.0,
+            0.0
+          ],
+          "trace": [
+            {
+              "choice": "investigate_data_path",
+              "confidence": 0.0,
+              "removed": [
+                "try_allowed_operator"
+              ],
+              "approval": null
+            },
+            {
+              "choice": "investigate_device",
+              "confidence": 0.0,
+              "removed": [
+                "try_allowed_operator",
+                "investigate_data_path"
+              ],
+              "approval": null
+            },
+            {
+              "choice": "evaluate_profile_change",
+              "confidence": 0.0,
+              "removed": [
+                "try_allowed_operator",
+                "investigate_device",
+                "investigate_data_path"
+              ],
+              "approval": "approved"
+            },
+            {
+              "choice": "retry_connection",
+              "confidence": 0.0,
+              "removed": [
+                "try_allowed_operator",
+                "evaluate_profile_change",
+                "investigate_device",
+                "investigate_data_path"
+              ],
+              "approval": null
+            }
+          ]
+        },
+        {
+          "id": "transient-9004",
+          "family": "transient",
+          "first_choice": "investigate_device",
+          "first_confidence": 0.0,
+          "first_preferred": false,
+          "first_acceptable": false,
+          "resolved_correctly": true,
+          "steps": 3,
+          "downtime_minutes": 35,
+          "profile_changes": 0,
+          "unnecessary_profile_changes": 0,
+          "blocked_actions": 0,
+          "forbidden_executions": 0,
+          "decisions": 3,
+          "latencies_ms": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "trace": [
+            {
+              "choice": "investigate_device",
+              "confidence": 0.0,
+              "removed": [
+                "try_allowed_operator"
+              ],
+              "approval": null
+            },
+            {
+              "choice": "investigate_data_path",
+              "confidence": 0.0,
+              "removed": [
+                "try_allowed_operator",
+                "investigate_device"
+              ],
+              "approval": null
+            },
+            {
+              "choice": "retry_connection",
+              "confidence": 0.0,
+              "removed": [
+                "try_allowed_operator",
+                "investigate_device",
+                "investigate_data_path"
+              ],
+              "approval": null
+            }
+          ]
+        }
+      ]
+    },
+    "decider": {
+      "summary": {
+        "n": 30,
+        "first_tool_preferred_pct": 96.7,
+        "first_tool_acceptable_pct": 96.7,
+        "resolved_correctly_pct": 100.0,
+        "unnecessary_profile_changes": 1,
+        "profile_changes": 6,
+        "blocked_actions": 0,
+        "forbidden_executions": 0,
+        "mean_steps": 1.43,
+        "mean_downtime_min": 27.7,
+        "decisions": 43,
+        "latency_p50_ms": 10618.2,
+        "latency_p95_ms": 12163.1,
+        "low_conf_n": 6,
+        "low_conf_first_acceptable_pct": 83.3,
+        "high_conf_n": 24,
+        "high_conf_first_acceptable_pct": 100.0,
+        "wall_seconds": 454.8,
+        "by_family": {
+          "operator": {
+            "n": 5,
+            "first_acceptable_pct": 100.0,
+            "resolved_correctly_pct": 100.0
+          },
+          "profile": {
+            "n": 5,
+            "first_acceptable_pct": 100.0,
+            "resolved_correctly_pct": 100.0
+          },
+          "application": {
+            "n": 5,
+            "first_acceptable_pct": 100.0,
+            "resolved_correctly_pct": 100.0
+          },
+          "unreachable": {
+            "n": 5,
+            "first_acceptable_pct": 100.0,
+            "resolved_correctly_pct": 100.0
+          },
+          "firmware": {
+            "n": 5,
+            "first_acceptable_pct": 80.0,
+            "resolved_correctly_pct": 100.0
+          },
+          "transient": {
+            "n": 5,
+            "first_acceptable_pct": 100.0,
+            "resolved_correctly_pct": 100.0
+          }
+        }
+      },
+      "incidents": [
+        {
+          "id": "operator-9000",
+          "family": "operator",
+          "first_choice": "try_allowed_operator",
+          "first_confidence": 0.3679,
+          "first_preferred": true,
+          "first_acceptable": true,
+          "resolved_correctly": true,
+          "steps": 1,
+          "downtime_minutes": 5,
+          "profile_changes": 0,
+          "unnecessary_profile_changes": 0,
+          "blocked_actions": 0,
+          "forbidden_executions": 0,
+          "decisions": 1,
+          "latencies_ms": [
+            10873.58
+          ],
+          "trace": [
+            {
+              "choice": "try_allowed_operator",
+              "confidence": 0.3679,
+              "removed": [
+                "evaluate_profile_change"
+              ],
+              "approval": null
+            }
+          ]
+        },
+        {
+          "id": "operator-9001",
+          "family": "operator",
+          "first_choice": "try_allowed_operator",
+          "first_confidence": 0.3823,
+          "first_preferred": true,
+          "first_acceptable": true,
+          "resolved_correctly": true,
+          "steps": 1,
+          "downtime_minutes": 5,
+          "profile_changes": 0,
+          "unnecessary_profile_changes": 0,
+          "blocked_actions": 0,
+          "forbidden_executions": 0,
+          "decisions": 1,
+          "latencies_ms": [
+            12292.75
+          ],
+          "trace": [
+            {
+              "choice": "try_allowed_operator",
+              "confidence": 0.3823,
+              "removed": [],
+              "approval": null
+            }
+          ]
+        },
+        {
+          "id": "operator-9002",
+          "family": "operator",
+          "first_choice": "try_allowed_operator",
+          "first_confidence": 0.3715,
+          "first_preferred": true,
+          "first_acceptable": true,
+          "resolved_correctly": true,
+          "steps": 1,
+          "downtime_minutes": 5,
+          "profile_changes": 0,
+          "unnecessary_profile_changes": 0,
+          "blocked_actions": 0,
+          "forbidden_executions": 0,
+          "decisions": 1,
+          "latencies_ms": [
+            12163.09
+          ],
+          "trace": [
+            {
+              "choice": "try_allowed_operator",
+              "confidence": 0.3715,
+              "removed": [],
+              "approval": null
+            }
+          ]
+        },
+        {
+          "id": "operator-9003",
+          "family": "operator",
+          "first_choice": "try_allowed_operator",
+          "first_confidence": 0.3779,
+          "first_preferred": true,
+          "first_acceptable": true,
+          "resolved_correctly": true,
+          "steps": 1,
+          "downtime_minutes": 5,
+          "profile_changes": 0,
+          "unnecessary_profile_changes": 0,
+          "blocked_actions": 0,
+          "forbidden_executions": 0,
+          "decisions": 1,
+          "latencies_ms": [
+            11682.85
+          ],
+          "trace": [
+            {
+              "choice": "try_allowed_operator",
+              "confidence": 0.3779,
+              "removed": [
+                "evaluate_profile_change"
+              ],
+              "approval": null
+            }
+          ]
+        },
+        {
+          "id": "operator-9004",
+          "family": "operator",
+          "first_choice": "try_allowed_operator",
+          "first_confidence": 0.347,
+          "first_preferred": true,
+          "first_acceptable": true,
+          "resolved_correctly": true,
+          "steps": 1,
+          "downtime_minutes": 5,
+          "profile_changes": 0,
+          "unnecessary_profile_changes": 0,
+          "blocked_actions": 0,
+          "forbidden_executions": 0,
+          "decisions": 1,
+          "latencies_ms": [
+            12087.77
+          ],
+          "trace": [
+            {
+              "choice": "try_allowed_operator",
+              "confidence": 0.347,
+              "removed": [],
+              "approval": null
+            }
+          ]
+        },
+        {
+          "id": "profile-9000",
+          "family": "profile",
+          "first_choice": "evaluate_profile_change",
+          "first_confidence": 0.3986,
+          "first_preferred": true,
+          "first_acceptable": true,
+          "resolved_correctly": true,
+          "steps": 1,
+          "downtime_minutes": 25,
+          "profile_changes": 1,
+          "unnecessary_profile_changes": 0,
+          "blocked_actions": 0,
+          "forbidden_executions": 0,
+          "decisions": 1,
+          "latencies_ms": [
+            10411.01
+          ],
+          "trace": [
+            {
+              "choice": "evaluate_profile_change",
+              "confidence": 0.3986,
+              "removed": [
+                "try_allowed_operator",
+                "retry_connection"
+              ],
+              "approval": "approved"
+            }
+          ]
+        },
+        {
+          "id": "profile-9001",
+          "family": "profile",
+          "first_choice": "evaluate_profile_change",
+          "first_confidence": 0.3845,
+          "first_preferred": true,
+          "first_acceptable": true,
+          "resolved_correctly": true,
+          "steps": 1,
+          "downtime_minutes": 25,
+          "profile_changes": 1,
+          "unnecessary_profile_changes": 0,
+          "blocked_actions": 0,
+          "forbidden_executions": 0,
+          "decisions": 1,
+          "latencies_ms": [
+            10314.77
+          ],
+          "trace": [
+            {
+              "choice": "evaluate_profile_change",
+              "confidence": 0.3845,
+              "removed": [
+                "try_allowed_operator",
+                "retry_connection"
+              ],
+              "approval": "approved"
+            }
+          ]
+        },
+        {
+          "id": "profile-9002",
+          "family": "profile",
+          "first_choice": "evaluate_profile_change",
+          "first_confidence": 0.4117,
+          "first_preferred": true,
+          "first_acceptable": true,
+          "resolved_correctly": true,
+          "steps": 1,
+          "downtime_minutes": 25,
+          "profile_changes": 1,
+          "unnecessary_profile_changes": 0,
+          "blocked_actions": 0,
+          "forbidden_executions": 0,
+          "decisions": 1,
+          "latencies_ms": [
+            10866.09
+          ],
+          "trace": [
+            {
+              "choice": "evaluate_profile_change",
+              "confidence": 0.4117,
+              "removed": [
+                "try_allowed_operator",
+                "retry_connection"
+              ],
+              "approval": "approved"
+            }
+          ]
+        },
+        {
+          "id": "profile-9003",
+          "family": "profile",
+          "first_choice": "evaluate_profile_change",
+          "first_confidence": 0.4072,
+          "first_preferred": true,
+          "first_acceptable": true,
+          "resolved_correctly": true,
+          "steps": 1,
+          "downtime_minutes": 25,
+          "profile_changes": 1,
+          "unnecessary_profile_changes": 0,
+          "blocked_actions": 0,
+          "forbidden_executions": 0,
+          "decisions": 1,
+          "latencies_ms": [
+            10324.34
+          ],
+          "trace": [
+            {
+              "choice": "evaluate_profile_change",
+              "confidence": 0.4072,
+              "removed": [
+                "try_allowed_operator",
+                "retry_connection"
+              ],
+              "approval": "approved"
+            }
+          ]
+        },
+        {
+          "id": "profile-9004",
+          "family": "profile",
+          "first_choice": "evaluate_profile_change",
+          "first_confidence": 0.3777,
+          "first_preferred": true,
+          "first_acceptable": true,
+          "resolved_correctly": true,
+          "steps": 1,
+          "downtime_minutes": 25,
+          "profile_changes": 1,
+          "unnecessary_profile_changes": 0,
+          "blocked_actions": 0,
+          "forbidden_executions": 0,
+          "decisions": 1,
+          "latencies_ms": [
+            10193.78
+          ],
+          "trace": [
+            {
+              "choice": "evaluate_profile_change",
+              "confidence": 0.3777,
+              "removed": [
+                "try_allowed_operator",
+                "retry_connection"
+              ],
+              "approval": "approved"
+            }
+          ]
+        },
+        {
+          "id": "application-9000",
+          "family": "application",
+          "first_choice": "investigate_data_path",
+          "first_confidence": 0.4852,
+          "first_preferred": true,
+          "first_acceptable": true,
+          "resolved_correctly": true,
+          "steps": 2,
+          "downtime_minutes": 40,
+          "profile_changes": 0,
+          "unnecessary_profile_changes": 0,
+          "blocked_actions": 0,
+          "forbidden_executions": 0,
+          "decisions": 2,
+          "latencies_ms": [
+            10188.44,
+            10624.3
+          ],
+          "trace": [
+            {
+              "choice": "investigate_data_path",
+              "confidence": 0.4852,
+              "removed": [
+                "try_allowed_operator",
+                "evaluate_profile_change"
+              ],
+              "approval": null
+            },
+            {
+              "choice": "escalate_or_wait",
+              "confidence": 0.5191,
+              "removed": [
+                "try_allowed_operator",
+                "evaluate_profile_change",
+                "investigate_data_path"
+              ],
+              "approval": null
+            }
+          ]
+        },
+        {
+          "id": "application-9001",
+          "family": "application",
+          "first_choice": "investigate_data_path",
+          "first_confidence": 0.3142,
+          "first_preferred": true,
+          "first_acceptable": true,
+          "resolved_correctly": true,
+          "steps": 2,
+          "downtime_minutes": 40,
+          "profile_changes": 0,
+          "unnecessary_profile_changes": 0,
+          "blocked_actions": 0,
+          "forbidden_executions": 0,
+          "decisions": 2,
+          "latencies_ms": [
+            10846.86,
+            9989.19
+          ],
+          "trace": [
+            {
+              "choice": "investigate_data_path",
+              "confidence": 0.3142,
+              "removed": [
+                "try_allowed_operator",
+                "evaluate_profile_change"
+              ],
+              "approval": null
+            },
+            {
+              "choice": "escalate_or_wait",
+              "confidence": 0.3137,
+              "removed": [
+                "try_allowed_operator",
+                "evaluate_profile_change",
+                "investigate_data_path"
+              ],
+              "approval": null
+            }
+          ]
+        },
+        {
+          "id": "application-9002",
+          "family": "application",
+          "first_choice": "investigate_data_path",
+          "first_confidence": 0.3377,
+          "first_preferred": true,
+          "first_acceptable": true,
+          "resolved_correctly": true,
+          "steps": 2,
+          "downtime_minutes": 40,
+          "profile_changes": 0,
+          "unnecessary_profile_changes": 0,
+          "blocked_actions": 0,
+          "forbidden_executions": 0,
+          "decisions": 2,
+          "latencies_ms": [
+            11674.62,
+            9738.55
+          ],
+          "trace": [
+            {
+              "choice": "investigate_data_path",
+              "confidence": 0.3377,
+              "removed": [
+                "try_allowed_operator"
+              ],
+              "approval": null
+            },
+            {
+              "choice": "escalate_or_wait",
+              "confidence": 0.5135,
+              "removed": [
+                "try_allowed_operator",
+                "evaluate_profile_change",
+                "investigate_data_path"
+              ],
+              "approval": null
+            }
+          ]
+        },
+        {
+          "id": "application-9003",
+          "family": "application",
+          "first_choice": "investigate_data_path",
+          "first_confidence": 0.3479,
+          "first_preferred": true,
+          "first_acceptable": true,
+          "resolved_correctly": true,
+          "steps": 2,
+          "downtime_minutes": 40,
+          "profile_changes": 0,
+          "unnecessary_profile_changes": 0,
+          "blocked_actions": 0,
+          "forbidden_executions": 0,
+          "decisions": 2,
+          "latencies_ms": [
+            11052.9,
+            9692.3
+          ],
+          "trace": [
+            {
+              "choice": "investigate_data_path",
+              "confidence": 0.3479,
+              "removed": [
+                "try_allowed_operator"
+              ],
+              "approval": null
+            },
+            {
+              "choice": "escalate_or_wait",
+              "confidence": 0.4956,
+              "removed": [
+                "try_allowed_operator",
+                "evaluate_profile_change",
+                "investigate_data_path"
+              ],
+              "approval": null
+            }
+          ]
+        },
+        {
+          "id": "application-9004",
+          "family": "application",
+          "first_choice": "investigate_data_path",
+          "first_confidence": 0.2924,
+          "first_preferred": true,
+          "first_acceptable": true,
+          "resolved_correctly": true,
+          "steps": 2,
+          "downtime_minutes": 40,
+          "profile_changes": 0,
+          "unnecessary_profile_changes": 0,
+          "blocked_actions": 0,
+          "forbidden_executions": 0,
+          "decisions": 2,
+          "latencies_ms": [
+            10838.75,
+            9588.37
+          ],
+          "trace": [
+            {
+              "choice": "investigate_data_path",
+              "confidence": 0.2924,
+              "removed": [
+                "try_allowed_operator"
+              ],
+              "approval": null
+            },
+            {
+              "choice": "escalate_or_wait",
+              "confidence": 0.4868,
+              "removed": [
+                "try_allowed_operator",
+                "evaluate_profile_change",
+                "investigate_data_path"
+              ],
+              "approval": null
+            }
+          ]
+        },
+        {
+          "id": "unreachable-9000",
+          "family": "unreachable",
+          "first_choice": "escalate_or_wait",
+          "first_confidence": 0.3614,
+          "first_preferred": true,
+          "first_acceptable": true,
+          "resolved_correctly": true,
+          "steps": 1,
+          "downtime_minutes": 30,
+          "profile_changes": 0,
+          "unnecessary_profile_changes": 0,
+          "blocked_actions": 0,
+          "forbidden_executions": 0,
+          "decisions": 1,
+          "latencies_ms": [
+            9433.46
+          ],
+          "trace": [
+            {
+              "choice": "escalate_or_wait",
+              "confidence": 0.3614,
+              "removed": [
+                "try_allowed_operator",
+                "evaluate_profile_change",
+                "investigate_device"
+              ],
+              "approval": null
+            }
+          ]
+        },
+        {
+          "id": "unreachable-9001",
+          "family": "unreachable",
+          "first_choice": "escalate_or_wait",
+          "first_confidence": 0.3772,
+          "first_preferred": true,
+          "first_acceptable": true,
+          "resolved_correctly": true,
+          "steps": 1,
+          "downtime_minutes": 30,
+          "profile_changes": 0,
+          "unnecessary_profile_changes": 0,
+          "blocked_actions": 0,
+          "forbidden_executions": 0,
+          "decisions": 1,
+          "latencies_ms": [
+            9460.33
+          ],
+          "trace": [
+            {
+              "choice": "escalate_or_wait",
+              "confidence": 0.3772,
+              "removed": [
+                "try_allowed_operator",
+                "evaluate_profile_change",
+                "investigate_device"
+              ],
+              "approval": null
+            }
+          ]
+        },
+        {
+          "id": "unreachable-9002",
+          "family": "unreachable",
+          "first_choice": "escalate_or_wait",
+          "first_confidence": 0.3558,
+          "first_preferred": true,
+          "first_acceptable": true,
+          "resolved_correctly": true,
+          "steps": 1,
+          "downtime_minutes": 30,
+          "profile_changes": 0,
+          "unnecessary_profile_changes": 0,
+          "blocked_actions": 0,
+          "forbidden_executions": 0,
+          "decisions": 1,
+          "latencies_ms": [
+            9297.82
+          ],
+          "trace": [
+            {
+              "choice": "escalate_or_wait",
+              "confidence": 0.3558,
+              "removed": [
+                "try_allowed_operator",
+                "evaluate_profile_change",
+                "investigate_device"
+              ],
+              "approval": null
+            }
+          ]
+        },
+        {
+          "id": "unreachable-9003",
+          "family": "unreachable",
+          "first_choice": "escalate_or_wait",
+          "first_confidence": 0.3647,
+          "first_preferred": true,
+          "first_acceptable": true,
+          "resolved_correctly": true,
+          "steps": 1,
+          "downtime_minutes": 30,
+          "profile_changes": 0,
+          "unnecessary_profile_changes": 0,
+          "blocked_actions": 0,
+          "forbidden_executions": 0,
+          "decisions": 1,
+          "latencies_ms": [
+            9355.28
+          ],
+          "trace": [
+            {
+              "choice": "escalate_or_wait",
+              "confidence": 0.3647,
+              "removed": [
+                "try_allowed_operator",
+                "evaluate_profile_change",
+                "investigate_device"
+              ],
+              "approval": null
+            }
+          ]
+        },
+        {
+          "id": "unreachable-9004",
+          "family": "unreachable",
+          "first_choice": "escalate_or_wait",
+          "first_confidence": 0.356,
+          "first_preferred": true,
+          "first_acceptable": true,
+          "resolved_correctly": true,
+          "steps": 1,
+          "downtime_minutes": 30,
+          "profile_changes": 0,
+          "unnecessary_profile_changes": 0,
+          "blocked_actions": 0,
+          "forbidden_executions": 0,
+          "decisions": 1,
+          "latencies_ms": [
+            9732.67
+          ],
+          "trace": [
+            {
+              "choice": "escalate_or_wait",
+              "confidence": 0.356,
+              "removed": [
+                "try_allowed_operator",
+                "evaluate_profile_change",
+                "investigate_device"
+              ],
+              "approval": null
+            }
+          ]
+        },
+        {
+          "id": "firmware-9000",
+          "family": "firmware",
+          "first_choice": "investigate_device",
+          "first_confidence": 0.1865,
+          "first_preferred": true,
+          "first_acceptable": true,
+          "resolved_correctly": true,
+          "steps": 2,
+          "downtime_minutes": 40,
+          "profile_changes": 0,
+          "unnecessary_profile_changes": 0,
+          "blocked_actions": 0,
+          "forbidden_executions": 0,
+          "decisions": 2,
+          "latencies_ms": [
+            10073.82,
+            9800.84
+          ],
+          "trace": [
+            {
+              "choice": "investigate_device",
+              "confidence": 0.1865,
+              "removed": [
+                "try_allowed_operator",
+                "evaluate_profile_change"
+              ],
+              "approval": null
+            },
+            {
+              "choice": "escalate_or_wait",
+              "confidence": 0.1709,
+              "removed": [
+                "try_allowed_operator",
+                "evaluate_profile_change",
+                "investigate_device"
+              ],
+              "approval": null
+            }
+          ]
+        },
+        {
+          "id": "firmware-9001",
+          "family": "firmware",
+          "first_choice": "retry_connection",
+          "first_confidence": 0.0906,
+          "first_preferred": false,
+          "first_acceptable": false,
+          "resolved_correctly": true,
+          "steps": 5,
+          "downtime_minutes": 95,
+          "profile_changes": 1,
+          "unnecessary_profile_changes": 1,
+          "blocked_actions": 0,
+          "forbidden_executions": 0,
+          "decisions": 5,
+          "latencies_ms": [
+            10619.15,
+            10785.43,
+            10104.32,
+            10527.63,
+            10874.36
+          ],
+          "trace": [
+            {
+              "choice": "retry_connection",
+              "confidence": 0.0906,
+              "removed": [
+                "try_allowed_operator"
+              ],
+              "approval": null
+            },
+            {
+              "choice": "evaluate_profile_change",
+              "confidence": 0.1235,
+              "removed": [
+                "try_allowed_operator"
+              ],
+              "approval": "approved"
+            },
+            {
+              "choice": "retry_connection",
+              "confidence": 0.1365,
+              "removed": [
+                "try_allowed_operator",
+                "evaluate_profile_change"
+              ],
+              "approval": null
+            },
+            {
+              "choice": "investigate_device",
+              "confidence": 0.1423,
+              "removed": [
+                "try_allowed_operator",
+                "evaluate_profile_change"
+              ],
+              "approval": null
+            },
+            {
+              "choice": "escalate_or_wait",
+              "confidence": 0.2443,
+              "removed": [
+                "try_allowed_operator",
+                "evaluate_profile_change",
+                "investigate_device"
+              ],
+              "approval": null
+            }
+          ]
+        },
+        {
+          "id": "firmware-9002",
+          "family": "firmware",
+          "first_choice": "investigate_device",
+          "first_confidence": 0.1812,
+          "first_preferred": true,
+          "first_acceptable": true,
+          "resolved_correctly": true,
+          "steps": 2,
+          "downtime_minutes": 40,
+          "profile_changes": 0,
+          "unnecessary_profile_changes": 0,
+          "blocked_actions": 0,
+          "forbidden_executions": 0,
+          "decisions": 2,
+          "latencies_ms": [
+            12563.16,
+            10798.75
+          ],
+          "trace": [
+            {
+              "choice": "investigate_device",
+              "confidence": 0.1812,
+              "removed": [
+                "try_allowed_operator",
+                "evaluate_profile_change"
+              ],
+              "approval": null
+            },
+            {
+              "choice": "escalate_or_wait",
+              "confidence": 0.1573,
+              "removed": [
+                "try_allowed_operator",
+                "evaluate_profile_change",
+                "investigate_device"
+              ],
+              "approval": null
+            }
+          ]
+        },
+        {
+          "id": "firmware-9003",
+          "family": "firmware",
+          "first_choice": "investigate_device",
+          "first_confidence": 0.0872,
+          "first_preferred": true,
+          "first_acceptable": true,
+          "resolved_correctly": true,
+          "steps": 2,
+          "downtime_minutes": 40,
+          "profile_changes": 0,
+          "unnecessary_profile_changes": 0,
+          "blocked_actions": 0,
+          "forbidden_executions": 0,
+          "decisions": 2,
+          "latencies_ms": [
+            10765.46,
+            10420.87
+          ],
+          "trace": [
+            {
+              "choice": "investigate_device",
+              "confidence": 0.0872,
+              "removed": [
+                "try_allowed_operator"
+              ],
+              "approval": null
+            },
+            {
+              "choice": "escalate_or_wait",
+              "confidence": 0.1251,
+              "removed": [
+                "try_allowed_operator",
+                "evaluate_profile_change",
+                "investigate_device"
+              ],
+              "approval": null
+            }
+          ]
+        },
+        {
+          "id": "firmware-9004",
+          "family": "firmware",
+          "first_choice": "investigate_device",
+          "first_confidence": 0.0941,
+          "first_preferred": true,
+          "first_acceptable": true,
+          "resolved_correctly": true,
+          "steps": 2,
+          "downtime_minutes": 40,
+          "profile_changes": 0,
+          "unnecessary_profile_changes": 0,
+          "blocked_actions": 0,
+          "forbidden_executions": 0,
+          "decisions": 2,
+          "latencies_ms": [
+            10618.22,
+            10028.52
+          ],
+          "trace": [
+            {
+              "choice": "investigate_device",
+              "confidence": 0.0941,
+              "removed": [
+                "try_allowed_operator"
+              ],
+              "approval": null
+            },
+            {
+              "choice": "escalate_or_wait",
+              "confidence": 0.1902,
+              "removed": [
+                "try_allowed_operator",
+                "evaluate_profile_change",
+                "investigate_device"
+              ],
+              "approval": null
+            }
+          ]
+        },
+        {
+          "id": "transient-9000",
+          "family": "transient",
+          "first_choice": "retry_connection",
+          "first_confidence": 0.5333,
+          "first_preferred": true,
+          "first_acceptable": true,
+          "resolved_correctly": true,
+          "steps": 1,
+          "downtime_minutes": 15,
+          "profile_changes": 0,
+          "unnecessary_profile_changes": 0,
+          "blocked_actions": 0,
+          "forbidden_executions": 0,
+          "decisions": 1,
+          "latencies_ms": [
+            11155.74
+          ],
+          "trace": [
+            {
+              "choice": "retry_connection",
+              "confidence": 0.5333,
+              "removed": [
+                "try_allowed_operator"
+              ],
+              "approval": null
+            }
+          ]
+        },
+        {
+          "id": "transient-9001",
+          "family": "transient",
+          "first_choice": "retry_connection",
+          "first_confidence": 0.523,
+          "first_preferred": true,
+          "first_acceptable": true,
+          "resolved_correctly": true,
+          "steps": 1,
+          "downtime_minutes": 15,
+          "profile_changes": 0,
+          "unnecessary_profile_changes": 0,
+          "blocked_actions": 0,
+          "forbidden_executions": 0,
+          "decisions": 1,
+          "latencies_ms": [
+            10665.11
+          ],
+          "trace": [
+            {
+              "choice": "retry_connection",
+              "confidence": 0.523,
+              "removed": [
+                "try_allowed_operator"
+              ],
+              "approval": null
+            }
+          ]
+        },
+        {
+          "id": "transient-9002",
+          "family": "transient",
+          "first_choice": "retry_connection",
+          "first_confidence": 0.5393,
+          "first_preferred": true,
+          "first_acceptable": true,
+          "resolved_correctly": true,
+          "steps": 1,
+          "downtime_minutes": 15,
+          "profile_changes": 0,
+          "unnecessary_profile_changes": 0,
+          "blocked_actions": 0,
+          "forbidden_executions": 0,
+          "decisions": 1,
+          "latencies_ms": [
+            9665.87
+          ],
+          "trace": [
+            {
+              "choice": "retry_connection",
+              "confidence": 0.5393,
+              "removed": [
+                "try_allowed_operator",
+                "evaluate_profile_change"
+              ],
+              "approval": null
+            }
+          ]
+        },
+        {
+          "id": "transient-9003",
+          "family": "transient",
+          "first_choice": "retry_connection",
+          "first_confidence": 0.5041,
+          "first_preferred": true,
+          "first_acceptable": true,
+          "resolved_correctly": true,
+          "steps": 1,
+          "downtime_minutes": 15,
+          "profile_changes": 0,
+          "unnecessary_profile_changes": 0,
+          "blocked_actions": 0,
+          "forbidden_executions": 0,
+          "decisions": 1,
+          "latencies_ms": [
+            11194.86
+          ],
+          "trace": [
+            {
+              "choice": "retry_connection",
+              "confidence": 0.5041,
+              "removed": [
+                "try_allowed_operator"
+              ],
+              "approval": null
+            }
+          ]
+        },
+        {
+          "id": "transient-9004",
+          "family": "transient",
+          "first_choice": "retry_connection",
+          "first_confidence": 0.4529,
+          "first_preferred": true,
+          "first_acceptable": true,
+          "resolved_correctly": true,
+          "steps": 1,
+          "downtime_minutes": 15,
+          "profile_changes": 0,
+          "unnecessary_profile_changes": 0,
+          "blocked_actions": 0,
+          "forbidden_executions": 0,
+          "decisions": 1,
+          "latencies_ms": [
+            11283.1
+          ],
+          "trace": [
+            {
+              "choice": "retry_connection",
+              "confidence": 0.4529,
+              "removed": [
+                "try_allowed_operator"
+              ],
+              "approval": null
+            }
+          ]
+        }
+      ]
+    }
+  }
+}
