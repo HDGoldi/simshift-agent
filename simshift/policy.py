@@ -45,10 +45,27 @@ def exclusions(obs: dict) -> dict[str, str]:
     return out
 
 
-def profile_transition_gate(twin: FleetTwin, target: str, approved: bool) -> dict:
+# Allowed eUICC transition paths. Verification always precedes SUCCEEDED; a blocked request is never SENT.
+TRANSITION_PATHS = {
+    ("REQUESTED", "BLOCKED"),
+    ("REQUESTED", "VALIDATED", "APPROVED", "NOT_DELIVERED"),
+    ("REQUESTED", "VALIDATED", "APPROVED", "SENT", "ACK", "ENABLED", "VERIFYING", "SUCCEEDED"),
+    ("REQUESTED", "VALIDATED", "APPROVED", "SENT", "ACK", "ENABLED", "VERIFYING", "FAILED", "ROLLED_BACK"),
+    ("REQUESTED", "VALIDATED", "APPROVED", "SENT", "ACK", "ENABLED", "VERIFYING", "FAILED", "ROLLBACK_FAILED"),
+}
+
+
+def proposal_id(twin: FleetTwin, target: str) -> str:
+    """Identifies one proposed switch: cohort, from, to, and how many switches already ran. An approval is
+    bound to this id, so it cannot be reused for another target or after the switch it approved has run."""
+    return f"{idempotency_key(twin.scenario_id, twin.s['active_profile'], target)}.{twin.profile_changes}"
+
+
+def profile_transition_gate(twin: FleetTwin, target: str, approval: str | None) -> dict:
     """Hard checks before the virtual eIM may enable `target`. Returns every check and the verdict."""
     s = twin.s
     target_ops = s["profiles"].get(target, {}).get("operators", [])
+    pid = proposal_id(twin, target)
     checks = {
         "euicc_supports_profile_enable": s["euicc"]["supports_profile_enable"],
         "active_profile_failing_registration": twin.rates()["attach_success_rate"] < RESTORED_THRESHOLD,
@@ -60,22 +77,31 @@ def profile_transition_gate(twin: FleetTwin, target: str, approved: bool) -> dic
         "target_operator_in_coverage": any(o in s["operators_in_coverage"] for o in target_ops),
         "management_path_reachable": twin.management_reachable(),
         "owner_authorizes_profile_switch": s["owner_allows_profile_switch"],
-        "human_approval": approved,
+        "human_approval": approval == pid,  # bound to this exact proposal
     }
     failed = [k for k, ok in checks.items() if not ok]
-    return {"target": target, "checks": checks, "allowed": not failed, "failed": failed,
-            "idempotency_key": idempotency_key(twin.scenario_id, s["active_profile"], target)}
+    return {"target": target, "proposal_id": pid, "checks": checks, "allowed": not failed, "failed": failed}
 
 
-def guarded_profile_transition(twin: FleetTwin, target: str, approved: bool) -> dict:
+def guarded_profile_transition(twin: FleetTwin, target: str, approval: str | None) -> dict:
     """Gate -> virtual eIM enable -> verify registration AND app telemetry -> rollback if verification fails."""
-    gate = profile_transition_gate(twin, target, approved)
+    gate = profile_transition_gate(twin, target, approval)
     if not gate["allowed"]:
-        return {"executed": False, "gate": gate}
+        return _done({"executed": False, "gate": gate}, ["REQUESTED", "BLOCKED"])
     previous, previous_operator = twin.s["active_profile"], twin.s["serving_operator"]
-    result = twin.enable_profile(target, gate["idempotency_key"], approved=approved)
-    verified = result.get("ok", False) and twin.service_restored()
-    out = {"executed": result.get("ok", False), "gate": gate, "eim": result, "verified_restored": verified}
-    if result.get("ok") and not verified:
-        out["rollback"] = twin.rollback_profile(previous, previous_operator)
-    return out
+    result = twin.enable_profile(target, gate["proposal_id"], approved=True)
+    if not result.get("ok"):
+        return _done({"executed": False, "gate": gate, "eim": result}, ["REQUESTED", "VALIDATED", "APPROVED", "NOT_DELIVERED"])
+    states = ["REQUESTED", "VALIDATED", "APPROVED", "SENT", "ACK", "ENABLED", "VERIFYING"]
+    verified = twin.service_restored()
+    out = {"executed": True, "gate": gate, "eim": result, "verified_restored": verified}
+    if verified:
+        return _done(out, states + ["SUCCEEDED"])
+    out["rollback"] = twin.rollback_profile(previous, previous_operator)
+    return _done(out, states + ["FAILED", "ROLLED_BACK" if out["rollback"]["ok"] else "ROLLBACK_FAILED"])
+
+
+def _done(out: dict, states: list[str]) -> dict:
+    if tuple(states) not in TRANSITION_PATHS:
+        raise RuntimeError(f"illegal eUICC transition path {states}")
+    return {**out, "transition": states}

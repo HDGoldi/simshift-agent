@@ -19,7 +19,7 @@ from strands.models import BedrockModel
 
 from patterns.capability_aware_router.router import CapabilityAwareRouter, DeciderClient, ReplayDecider
 
-from .policy import FALLBACK, OPTIONS, READ_ONLY, exclusions, guarded_profile_transition
+from .policy import FALLBACK, OPTIONS, READ_ONLY, exclusions, guarded_profile_transition, proposal_id
 from .simulator import SCENARIOS, FleetTwin
 
 QUESTION = ("Given the cellular connectivity symptoms, diagnostic evidence so far, and only these admissible tools, "
@@ -83,7 +83,8 @@ def build_tools(twin: FleetTwin, approve: bool, llm: BedrockModel | None) -> lis
                 "Decide whether proceeding is advisable and list concrete risks. You do not authorize anything.\n"
                 f"Observed state: {json.dumps(twin.observe())}\nProfiles: {json.dumps(twin.get_profiles())}\n"
                 f"Proposed target: {target}"), ProfilePlan)
-        return {"target": target, "bedrock_plan": plan, **guarded_profile_transition(twin, target, approved=approve)}
+        approval = proposal_id(twin, target) if approve else None  # scripted pre-approval of this exact proposal
+        return {"target": target, "bedrock_plan": plan, **guarded_profile_transition(twin, target, approval)}
 
     @tool
     def defer_or_escalate() -> dict:
@@ -178,7 +179,8 @@ if __name__ == "__main__":
     res = run(a.scenario, approve=a.approve, decider=decider, use_bedrock=not a.no_bedrock)
     res["decider_source"] = source
     _print(res, source)
-    if a.out:
+    if a.out:  # atomic: an interrupted run never leaves a half-written trace
         os.makedirs(os.path.dirname(a.out) or ".", exist_ok=True)
-        with open(a.out, "w") as f:
+        with open(a.out + ".tmp", "w") as f:
             json.dump(res, f, indent=1)
+        os.replace(a.out + ".tmp", a.out)

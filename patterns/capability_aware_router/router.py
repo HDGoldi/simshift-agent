@@ -42,6 +42,23 @@ class DeciderClient:
                 "client_latency_ms": round((time.perf_counter() - t0) * 1000, 1)}
 
 
+def inconsistent(raw: dict, options: dict) -> str | None:
+    """Checks a `choice` answer against the question it answers. None if consistent, else what is wrong.
+    Every real answer satisfies these (probabilities are rounded to 4 decimals, hence the tolerance)."""
+    p, n = raw["probabilities"], len(options)
+    if not all(isinstance(v, (int, float)) for v in p.values()):
+        return "non-numeric probabilities"
+    if set(p) != set(options):
+        return "probabilities do not cover exactly the offered options"
+    if abs(sum(p.values()) - 1) > 2e-3:
+        return f"probabilities sum to {sum(p.values()):.4f}"
+    if p[raw["choice"]] < max(p.values()):
+        return "choice is not the most probable option"
+    if abs(raw["confidence"] - (n * max(p.values()) - 1) / (n - 1)) > 2e-3:
+        return "confidence does not match (N*p_max - 1)/(N - 1)"
+    return None
+
+
 class ReplayDecider:
     """Replays recorded Decider answers in order (from Decision.raw in a saved trace). Refuses if the live
     question differs from the recorded one, so a stale answer is never applied to a different state."""
@@ -102,6 +119,10 @@ class CapabilityAwareRouter:
             return Decision(self.instructions, decider_state if decider_state is not None else state, eligible,
                             excluded, raw, self.fallback, "fallback",
                             f"Decider returned non-admissible option {raw['choice']!r}", self.tools[self.fallback])
+        if bad := inconsistent(raw, eligible):  # fail closed: answer does not match the question asked
+            return Decision(self.instructions, decider_state if decider_state is not None else state, eligible,
+                            excluded, raw, self.fallback, "fallback", f"inconsistent Decider answer: {bad}",
+                            self.tools[self.fallback])
         if raw["confidence"] >= self.act_threshold:
             sel, route, why = raw["choice"], "act", f"confidence {raw['confidence']:.2f} >= {self.act_threshold}"
         else:

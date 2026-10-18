@@ -7,13 +7,17 @@ from patterns.capability_aware_router.router import CapabilityAwareRouter
 
 
 class FakeDecider:
-    def __init__(self, choice, probs=None, confidence=0.9):
+    """Answers like the real model: confidence is derived from the probabilities unless overridden."""
+
+    def __init__(self, choice, probs=None, confidence=None):
         self.choice, self.probs, self.confidence, self.calls = choice, probs, confidence, []
 
     def choose(self, state, instructions, options, name="next_tool"):
         self.calls.append({"state": state, "options": dict(options)})
         probs = self.probs or {o: (1.0 if o == self.choice else 0.0) for o in options}
-        return {"choice": self.choice, "probabilities": probs, "confidence": self.confidence}
+        n = len(probs)
+        conf = self.confidence if self.confidence is not None else (n * max(probs.values()) - 1) / (n - 1)
+        return {"choice": self.choice, "probabilities": probs, "confidence": conf}
 
 
 ran = []
@@ -73,12 +77,22 @@ def test_capability_filter_never_offers_excluded_option():
 
 
 def test_low_confidence_gathers_evidence_then_falls_back():
-    r, _, _ = setup(FakeDecider("a", {"a": 0.4, "b": 0.3, "look": 0.2, "hold": 0.1}, confidence=0.2))
+    r, _, _ = setup(FakeDecider("a", {"a": 0.4, "b": 0.3, "look": 0.2, "hold": 0.1}))  # confidence 0.2
     assert r.decide({}).selected == "look"
-    r, _, _ = setup(FakeDecider("a", {"a": 0.5, "b": 0.3, "hold": 0.2}, confidence=0.2),
+    r, _, _ = setup(FakeDecider("a", {"a": 0.5, "b": 0.3, "hold": 0.2}),  # confidence 0.25
                     policy=lambda s: {"look": "already done"})
     d = r.decide({})
-    assert (d.selected, d.route) == ("hold", "fallback")
+    assert (d.selected, d.route) == ("hold", "fallback") and "no read-only option" in d.reason
+
+
+def test_inconsistent_answer_fails_closed():
+    for probs, conf in (({"a": 0.9, "b": 0.05, "look": 0.05, "hold": 0.05}, None),  # sums to 1.05
+                        ({"a": 0.2, "b": 0.6, "look": 0.1, "hold": 0.1}, None),  # choice is not the argmax
+                        ({"a": 0.7, "b": 0.1, "look": 0.1, "hold": 0.1}, 0.99),  # confidence not derived
+                        ({"a": 0.7, "b": 0.3}, None)):  # options missing
+        r, agent, seen = setup(FakeDecider("a", probs, conf))
+        d, _ = r.step(agent, {})
+        assert (d.selected, d.route, seen) == ("hold", "fallback", ["hold"]) and "inconsistent" in d.reason, probs
 
 
 def test_forbidden_action_denied_even_on_direct_call():
@@ -132,7 +146,7 @@ def test_replay_keeps_recorded_outages_in_order():
             self.n += 1
             if self.n == 1:
                 raise OSError("down")
-            return {"choice": "a", "probabilities": {o: float(o == "a") for o in options}, "confidence": 0.9}
+            return {"choice": "a", "probabilities": {o: float(o == "a") for o in options}, "confidence": 1.0}
     recorder, _, _ = setup(Flaky())
     rec = [vars(recorder.decide({"t": i})) for i in (1, 2)]
     r, _, _ = setup(ReplayDecider(rec))

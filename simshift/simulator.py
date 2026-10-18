@@ -107,6 +107,7 @@ class FleetTwin:
         self.diagnostics: dict[str, dict] = {}
         self.events: list[dict] = []
         self.commands: dict[str, dict] = {}  # idempotency key -> result
+        self.profile_changes = 0  # executed profile enables (rollbacks not subtracted)
 
     def clone(self) -> "FleetTwin":
         return copy.deepcopy(self)
@@ -227,6 +228,7 @@ class FleetTwin:
             ops = [o for o in s["profiles"][target]["operators"] if o in s["operators_in_coverage"]]
             if ops:
                 s["serving_operator"] = ops[0]
+            self.profile_changes += 1
             res = self._log("eim_enable_profile", ok=True, from_profile=prev, to_profile=target,
                             ipa_ack=True, serving_operator=s["serving_operator"],
                             restored=self.service_restored(), rates=self.rates())
