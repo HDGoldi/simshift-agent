@@ -1,0 +1,21 @@
+[project]
+name = "simshift"
+version = "0.1.0"
+description = "SIMShift: capability-aware IoT connectivity recovery agent (Strands Decider 2B + Amazon Bedrock) on a synthetic digital twin"
+requires-python = ">=3.12"
+license = "Apache-2.0"
+dependencies = ["strands-agents==1.61.1", "pydantic>=2"]
+
+[dependency-groups]
+dev = ["pytest>=8"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests", "patterns/capability_aware_router/tests"]
+pythonpath = ["."]
+
+[tool.setuptools]
+packages = ["simshift", "patterns", "patterns.capability_aware_router"]
+
+[build-system]
+requires = ["setuptools>=77"]
+build-backend = "setuptools.build_meta"

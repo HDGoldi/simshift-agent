@@ -1,0 +1,328 @@
+{
+ "scenario": "BR_PROFILE",
+ "title": "Brazil: active profile cannot register; alternate installed profile",
+ "approved": true,
+ "bedrock_model": "eu.anthropic.claude-haiku-5-5",
+ "trace": [
+  {
+   "step": 1,
+   "decision": {
+    "question": "Given the cellular connectivity symptoms, diagnostic evidence so far, and only these admissible tools, which next tool is most useful for safely advancing service restoration? Do not assume an unverified recovery path works.",
+    "state": {
+     "incident": "Persistent cellular attach failures",
+     "country": "BR",
+     "affected_devices": 3200,
+     "attach_success_rate": 0.04,
+     "data_session_rate": 0.03,
+     "app_ack_rate": 0.0,
+     "heartbeat_rate": 0.04,
+     "serving_operator": "BR-NET-1",
+     "active_profile": "profile_A",
+     "other_operator_allowed_on_active_profile": false,
+     "alternative_profile_installed": true,
+     "management_path_reachable": true,
+     "recent_firmware_change": false,
+     "attempted_retries": 3,
+     "diagnostics": {}
+    },
+    "eligible": {
+     "retry_connection": "Bounded backoff and re-attach on the current profile and operator; suits brief or improving disruptions",
+     "investigate_device": "Read-only: pull modem and firmware diagnostics from the devices",
+     "investigate_data_path": "Read-only: check network-side data sessions, APN and application ingestion; suits devices that register but whose telemetry fails",
+     "escalate_or_wait": "Hold and hand off to a human with the collected evidence; suits cases no admissible remote action can fix"
+    },
+    "excluded": {
+     "try_allowed_operator": "active profile permits no other operator in coverage",
+     "evaluate_profile_change": "needs modem evidence (registration reject cause) before a profile switch"
+    },
+    "raw": {
+     "choice": "retry_connection",
+     "probabilities": {
+      "retry_connection": 0.2803,
+      "investigate_device": 0.2131,
+      "investigate_data_path": 0.2742,
+      "escalate_or_wait": 0.2324
+     },
+     "confidence": 0.0404,
+     "model": "strands-decider-2B-qwen3.5-v1-2610",
+     "latency_ms": 516.65,
+     "client_latency_ms": 536.5
+    },
+    "selected": "investigate_data_path",
+    "route": "gather_evidence",
+    "reason": "confidence 0.04 < 0.5: most probable read-only option",
+    "tool": "query_apn_session_app_diagnostics"
+   },
+   "tool": "query_apn_session_app_diagnostics",
+   "tool_status": "success",
+   "tool_result": {
+    "seq": 1,
+    "kind": "diagnostics_data_path",
+    "result": {
+     "pdn_sessions": "none",
+     "summary": "no data sessions; attach failing on BR-NET-1"
+    }
+   },
+   "rates_after": {
+    "attach_success_rate": 0.04,
+    "data_session_rate": 0.03,
+    "app_ack_rate": 0.0,
+    "heartbeat_rate": 0.04
+   }
+  },
+  {
+   "step": 2,
+   "decision": {
+    "question": "Given the cellular connectivity symptoms, diagnostic evidence so far, and only these admissible tools, which next tool is most useful for safely advancing service restoration? Do not assume an unverified recovery path works.",
+    "state": {
+     "incident": "Persistent cellular attach failures",
+     "country": "BR",
+     "affected_devices": 3200,
+     "attach_success_rate": 0.04,
+     "data_session_rate": 0.03,
+     "app_ack_rate": 0.0,
+     "heartbeat_rate": 0.04,
+     "serving_operator": "BR-NET-1",
+     "active_profile": "profile_A",
+     "other_operator_allowed_on_active_profile": false,
+     "alternative_profile_installed": true,
+     "management_path_reachable": true,
+     "recent_firmware_change": false,
+     "attempted_retries": 3,
+     "diagnostics": {
+      "data_path": {
+       "pdn_sessions": "none",
+       "summary": "no data sessions; attach failing on BR-NET-1"
+      }
+     }
+    },
+    "eligible": {
+     "retry_connection": "Bounded backoff and re-attach on the current profile and operator; suits brief or improving disruptions",
+     "investigate_device": "Read-only: pull modem and firmware diagnostics from the devices",
+     "escalate_or_wait": "Hold and hand off to a human with the collected evidence; suits cases no admissible remote action can fix"
+    },
+    "excluded": {
+     "try_allowed_operator": "active profile permits no other operator in coverage",
+     "evaluate_profile_change": "needs modem evidence (registration reject cause) before a profile switch",
+     "investigate_data_path": "evidence already collected"
+    },
+    "raw": {
+     "choice": "retry_connection",
+     "probabilities": {
+      "retry_connection": 0.4662,
+      "investigate_device": 0.2383,
+      "escalate_or_wait": 0.2955
+     },
+     "confidence": 0.1993,
+     "model": "strands-decider-2B-qwen3.5-v1-2610",
+     "latency_ms": 422.55,
+     "client_latency_ms": 424.5
+    },
+    "selected": "investigate_device",
+    "route": "gather_evidence",
+    "reason": "confidence 0.20 < 0.5: most probable read-only option",
+    "tool": "query_firmware_modem_diagnostics"
+   },
+   "tool": "query_firmware_modem_diagnostics",
+   "tool_status": "success",
+   "tool_result": {
+    "seq": 2,
+    "kind": "diagnostics_device",
+    "result": {
+     "available": true,
+     "firmware_uniform": true,
+     "modem_resets_per_day": 0.1,
+     "reject_cause": "#17 network failure from serving operator",
+     "summary": "modem healthy; registration rejected by BR-NET-1"
+    }
+   },
+   "rates_after": {
+    "attach_success_rate": 0.04,
+    "data_session_rate": 0.03,
+    "app_ack_rate": 0.0,
+    "heartbeat_rate": 0.04
+   }
+  },
+  {
+   "step": 3,
+   "decision": {
+    "question": "Given the cellular connectivity symptoms, diagnostic evidence so far, and only these admissible tools, which next tool is most useful for safely advancing service restoration? Do not assume an unverified recovery path works.",
+    "state": {
+     "incident": "Persistent cellular attach failures",
+     "country": "BR",
+     "affected_devices": 3200,
+     "attach_success_rate": 0.04,
+     "data_session_rate": 0.03,
+     "app_ack_rate": 0.0,
+     "heartbeat_rate": 0.04,
+     "serving_operator": "BR-NET-1",
+     "active_profile": "profile_A",
+     "other_operator_allowed_on_active_profile": false,
+     "alternative_profile_installed": true,
+     "management_path_reachable": true,
+     "recent_firmware_change": false,
+     "attempted_retries": 3,
+     "diagnostics": {
+      "data_path": {
+       "pdn_sessions": "none",
+       "summary": "no data sessions; attach failing on BR-NET-1"
+      },
+      "device": {
+       "available": true,
+       "firmware_uniform": true,
+       "modem_resets_per_day": 0.1,
+       "reject_cause": "#17 network failure from serving operator",
+       "summary": "modem healthy; registration rejected by BR-NET-1"
+      }
+     }
+    },
+    "eligible": {
+     "retry_connection": "Bounded backoff and re-attach on the current profile and operator; suits brief or improving disruptions",
+     "evaluate_profile_change": "Assess a managed switch to an installed alternate eSIM profile (does not execute it); suits an active profile that cannot register on any allowed operator",
+     "escalate_or_wait": "Hold and hand off to a human with the collected evidence; suits cases no admissible remote action can fix"
+    },
+    "excluded": {
+     "try_allowed_operator": "active profile permits no other operator in coverage",
+     "investigate_device": "evidence already collected",
+     "investigate_data_path": "evidence already collected"
+    },
+    "raw": {
+     "choice": "evaluate_profile_change",
+     "probabilities": {
+      "retry_connection": 0.0939,
+      "evaluate_profile_change": 0.8742,
+      "escalate_or_wait": 0.0319
+     },
+     "confidence": 0.8113,
+     "model": "strands-decider-2B-qwen3.5-v1-2610",
+     "latency_ms": 482.22,
+     "client_latency_ms": 484.0
+    },
+    "selected": "evaluate_profile_change",
+    "route": "act",
+    "reason": "confidence 0.81 >= 0.5",
+    "tool": "prepare_guarded_profile_transition"
+   },
+   "tool": "prepare_guarded_profile_transition",
+   "tool_status": "success",
+   "tool_result": {
+    "target": "profile_B",
+    "bedrock_plan": {
+     "recommend_proceeding": true,
+     "rationale": "The evidence points to a serving-operator problem rather than a device problem. The modem is healthy (0.1 resets/day), firmware is uniform with no recent change, and the device reports reject cause #17 (\"network failure\") from BR-NET-1. Attach success is 4%, data sessions 3%, and app acknowledgements 0%. Three retries have not recovered the fleet. Profile_B (BR-NET-2) is already installed, and profile_A's policy does not allow any other operator, so switching profiles is the only in-band path to a different network. The management path is reachable, so the switch can be observed and reversed. Because profile_A stays installed, rollback is available. Proceeding is advisable as a staged, reversible change, not as an immediate fleet-wide cutover. Confirm the fault is isolated to BR-NET-1 before the full cutover, and check that BR-NET-2 is viable for these devices before moving all 3,200 of them.",
+     "risks": [
+      "Reject cause #17 is generic. BR-NET-1 may be experiencing a wider outage or an issue with this device's subscription or IMEI. If so, the problem may not be fixed by switching, and BR-NET-2 could reject the same devices for the same reason.",
+      "BR-NET-2 has not been validated for this cohort. Coverage at device locations, subscription provisioning, data plan, APN and IP settings, and roaming or contract terms all need checking before cutover.",
+      "Switching all 3,200 devices at once could create a signalling surge (thundering herd) on BR-NET-2 and cause mass attach failures there too.",
+      "A profile switch can fail partway through (download, enable, or disable step). A device left with no enabled profile would lose connectivity, and recovery might require physical or out-of-band access.",
+      "Profile_A and profile_B must not both be enabled. The switch sequence has to disable A before enabling B to avoid a conflicting or non-attaching state.",
+      "Changing operator changes network identity (MSISDN/IMSI, IP range, possibly the public address). Backend allowlists, APN-bound services, firewall rules, and device identity records may break.",
+      "Management path reachability must be confirmed as independent of the cellular link. If the management path depends on BR-NET-1, the switch may be irreversible from the control plane.",
+      "Rollback is only useful if BR-NET-1 recovers or the fault is confirmed as transient. Reverting to profile_A while BR-NET-1 is still failing would restore a non-working state.",
+      "Switching operators may change billing, contractual obligations, data-usage limits, and regulatory requirements in Brazil (e.g., ANATEL rules, data residency, or lawful intercept). These need review before fleet-wide use.",
+      "Zero app acknowledgements means application-level behaviour after the switch is unverified. Heartbeat and ack paths need end-to-end testing on BR-NET-2 before the change is considered successful.",
+      "Retries have already run three times. Further automatic retries or mass switching could add load and cost without a clear success signal. A canary group with explicit success and abort thresholds is needed.",
+      "The pre-switch state for the rest of the fleet is unknown. Some devices may already be partly attached or in a mixed profile state. Inventory and state reconciliation should happen before the change."
+     ]
+    },
+    "executed": true,
+    "gate": {
+     "target": "profile_B",
+     "checks": {
+      "euicc_supports_profile_enable": true,
+      "active_profile_failing_registration": true,
+      "registration_reject_evidence": true,
+      "no_operator_reselection_available": true,
+      "target_installed_and_not_active": true,
+      "target_operator_in_coverage": true,
+      "management_path_reachable": true,
+      "owner_authorizes_profile_switch": true,
+      "human_approval": true
+     },
+     "allowed": true,
+     "failed": [],
+     "idempotency_key": "b6a82b340f124789"
+    },
+    "eim": {
+     "seq": 3,
+     "kind": "eim_enable_profile",
+     "ok": true,
+     "from_profile": "profile_A",
+     "to_profile": "profile_B",
+     "ipa_ack": true,
+     "serving_operator": "BR-NET-2",
+     "restored": true,
+     "rates": {
+      "attach_success_rate": 0.997,
+      "data_session_rate": 0.99,
+      "app_ack_rate": 0.995,
+      "heartbeat_rate": 0.99
+     }
+    },
+    "verified_restored": true
+   },
+   "rates_after": {
+    "attach_success_rate": 0.997,
+    "data_session_rate": 0.99,
+    "app_ack_rate": 0.995,
+    "heartbeat_rate": 0.99
+   }
+  }
+ ],
+ "outcome": {
+  "restored": true,
+  "initial_rates": {
+   "attach_success_rate": 0.04,
+   "data_session_rate": 0.03,
+   "app_ack_rate": 0.0,
+   "heartbeat_rate": 0.04
+  },
+  "final_rates": {
+   "attach_success_rate": 0.997,
+   "data_session_rate": 0.99,
+   "app_ack_rate": 0.995,
+   "heartbeat_rate": 0.99
+  },
+  "active_profile": "profile_B",
+  "serving_operator": "BR-NET-2",
+  "steps": 3
+ },
+ "explanation": "**Observed**\n- No data sessions; attach failing on BR-NET-1.\n- Modem healthy; registration rejected with cause #17 from BR-NET-1.\n- Profile_A allowed no other operator; profile_B was already installed.\n- Gates passed, including human approval. Switched profile_A to profile_B; BR-NET-2 is now serving.\n- Attach 4% to 99.7%, data 3% to 99%, app ack 0% to 99.5%, heartbeat 4% to 99%.\n\n**Why:** The modem looked healthy, so the agent judged a device fault unlikely. It moved to the only in-band alternative network as a reversible change, keeping profile_A installed.\n\n**Uncertain**\n- Root cause of #17: a BR-NET-1 outage or a subscription/IMEI issue.\n- Scope: the trace does not confirm whether all 3,200 devices switched.\n- Whether the post-switch rates are fleet-wide or sampled.\n- Billing, regulatory, and allowlist impacts are unverified.",
+ "events": [
+  {
+   "seq": 1,
+   "kind": "diagnostics_data_path",
+   "result": {
+    "pdn_sessions": "none",
+    "summary": "no data sessions; attach failing on BR-NET-1"
+   }
+  },
+  {
+   "seq": 2,
+   "kind": "diagnostics_device",
+   "result": {
+    "available": true,
+    "firmware_uniform": true,
+    "modem_resets_per_day": 0.1,
+    "reject_cause": "#17 network failure from serving operator",
+    "summary": "modem healthy; registration rejected by BR-NET-1"
+   }
+  },
+  {
+   "seq": 3,
+   "kind": "eim_enable_profile",
+   "ok": true,
+   "from_profile": "profile_A",
+   "to_profile": "profile_B",
+   "ipa_ack": true,
+   "serving_operator": "BR-NET-2",
+   "restored": true,
+   "rates": {
+    "attach_success_rate": 0.997,
+    "data_session_rate": 0.99,
+    "app_ack_rate": 0.995,
+    "heartbeat_rate": 0.99
+   }
+  }
+ ]
+}

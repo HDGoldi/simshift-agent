@@ -1,0 +1,172 @@
+{
+ "scenario": "OFFLINE",
+ "title": "Remote devices: no heartbeat, no management path",
+ "approved": true,
+ "bedrock_model": "eu.anthropic.claude-haiku-5-5",
+ "trace": [
+  {
+   "step": 1,
+   "decision": {
+    "question": "Given the cellular connectivity symptoms, diagnostic evidence so far, and only these admissible tools, which next tool is most useful for safely advancing service restoration? Do not assume an unverified recovery path works.",
+    "state": {
+     "incident": "Devices silent; no heartbeat",
+     "country": "CL",
+     "affected_devices": 1250,
+     "attach_success_rate": 0.0,
+     "data_session_rate": 0.0,
+     "app_ack_rate": 0.0,
+     "heartbeat_rate": 0.0,
+     "serving_operator": "CL-NET-1",
+     "active_profile": "profile_A",
+     "other_operator_allowed_on_active_profile": false,
+     "alternative_profile_installed": true,
+     "management_path_reachable": false,
+     "recent_firmware_change": false,
+     "attempted_retries": 2,
+     "diagnostics": {}
+    },
+    "eligible": {
+     "retry_connection": "Bounded backoff and re-attach on the current profile and operator; suits brief or improving disruptions",
+     "investigate_data_path": "Read-only: check network-side data sessions, APN and application ingestion; suits devices that register but whose telemetry fails",
+     "escalate_or_wait": "Hold and hand off to a human with the collected evidence; suits cases no admissible remote action can fix"
+    },
+    "excluded": {
+     "try_allowed_operator": "active profile permits no other operator in coverage",
+     "investigate_device": "devices unreachable; no modem logs retrievable",
+     "evaluate_profile_change": "no management path to the IPA; OTA profile change impossible"
+    },
+    "raw": {
+     "choice": "investigate_data_path",
+     "probabilities": {
+      "retry_connection": 0.2588,
+      "investigate_data_path": 0.3724,
+      "escalate_or_wait": 0.3688
+     },
+     "confidence": 0.0586,
+     "model": "strands-decider-2B-qwen3.5-v1-2610",
+     "latency_ms": 409.61,
+     "client_latency_ms": 422.4
+    },
+    "selected": "investigate_data_path",
+    "route": "gather_evidence",
+    "reason": "confidence 0.06 < 0.5: most probable read-only option",
+    "tool": "query_apn_session_app_diagnostics"
+   },
+   "tool": "query_apn_session_app_diagnostics",
+   "tool_status": "success",
+   "tool_result": {
+    "seq": 1,
+    "kind": "diagnostics_data_path",
+    "result": {
+     "network_side_attach_attempts_last_6h": 0,
+     "summary": "no attach attempts seen by any network; last known cells normal (power/field issue suspected)"
+    }
+   },
+   "rates_after": {
+    "attach_success_rate": 0.0,
+    "data_session_rate": 0.0,
+    "app_ack_rate": 0.0,
+    "heartbeat_rate": 0.0
+   }
+  },
+  {
+   "step": 2,
+   "decision": {
+    "question": "Given the cellular connectivity symptoms, diagnostic evidence so far, and only these admissible tools, which next tool is most useful for safely advancing service restoration? Do not assume an unverified recovery path works.",
+    "state": {
+     "incident": "Devices silent; no heartbeat",
+     "country": "CL",
+     "affected_devices": 1250,
+     "attach_success_rate": 0.0,
+     "data_session_rate": 0.0,
+     "app_ack_rate": 0.0,
+     "heartbeat_rate": 0.0,
+     "serving_operator": "CL-NET-1",
+     "active_profile": "profile_A",
+     "other_operator_allowed_on_active_profile": false,
+     "alternative_profile_installed": true,
+     "management_path_reachable": false,
+     "recent_firmware_change": false,
+     "attempted_retries": 2,
+     "diagnostics": {
+      "data_path": {
+       "network_side_attach_attempts_last_6h": 0,
+       "summary": "no attach attempts seen by any network; last known cells normal (power/field issue suspected)"
+      }
+     }
+    },
+    "eligible": {
+     "retry_connection": "Bounded backoff and re-attach on the current profile and operator; suits brief or improving disruptions",
+     "escalate_or_wait": "Hold and hand off to a human with the collected evidence; suits cases no admissible remote action can fix"
+    },
+    "excluded": {
+     "try_allowed_operator": "active profile permits no other operator in coverage",
+     "investigate_device": "devices unreachable; no modem logs retrievable",
+     "evaluate_profile_change": "no management path to the IPA; OTA profile change impossible",
+     "investigate_data_path": "evidence already collected"
+    },
+    "raw": {
+     "choice": "escalate_or_wait",
+     "probabilities": {
+      "retry_connection": 0.3441,
+      "escalate_or_wait": 0.6559
+     },
+     "confidence": 0.3118,
+     "model": "strands-decider-2B-qwen3.5-v1-2610",
+     "latency_ms": 366.74,
+     "client_latency_ms": 368.0
+    },
+    "selected": "escalate_or_wait",
+    "route": "fallback",
+    "reason": "confidence 0.31 < 0.5 and no read-only option left",
+    "tool": "defer_or_escalate"
+   },
+   "tool": "defer_or_escalate",
+   "tool_status": "success",
+   "tool_result": {
+    "escalated": true,
+    "evidence": {
+     "data_path": {
+      "network_side_attach_attempts_last_6h": 0,
+      "summary": "no attach attempts seen by any network; last known cells normal (power/field issue suspected)"
+     }
+    }
+   },
+   "rates_after": {
+    "attach_success_rate": 0.0,
+    "data_session_rate": 0.0,
+    "app_ack_rate": 0.0,
+    "heartbeat_rate": 0.0
+   }
+  }
+ ],
+ "outcome": {
+  "restored": false,
+  "initial_rates": {
+   "attach_success_rate": 0.0,
+   "data_session_rate": 0.0,
+   "app_ack_rate": 0.0,
+   "heartbeat_rate": 0.0
+  },
+  "final_rates": {
+   "attach_success_rate": 0.0,
+   "data_session_rate": 0.0,
+   "app_ack_rate": 0.0,
+   "heartbeat_rate": 0.0
+  },
+  "active_profile": "profile_A",
+  "serving_operator": "CL-NET-1",
+  "steps": 2
+ },
+ "explanation": "**Observed:** The agent queried APN session diagnostics. No network saw attach attempts in 6 hours, and last known cells looked normal. It ruled out trying another operator (the profile permits none in coverage), investigating the device (unreachable, no modem logs), and changing the profile (no management path to the IPA). It then chose to investigate the data path (0.37, nearly tied with escalate at 0.37). With that evidence, it escalated/waited (0.66). Outcome: not restored. Attach, data-session, app-ack, and heartbeat rates stayed at 0.0 across both steps, on profile_A with CL-NET-1.\n\n**Uncertain:** The \"power/field issue\" is only a suspicion in the summary, not a confirmed cause. The trace doesn't explain why no attach attempts reached the network. Decider confidence was low (0.06, then 0.31). It also doesn't show whether the escalation was acted on.",
+ "events": [
+  {
+   "seq": 1,
+   "kind": "diagnostics_data_path",
+   "result": {
+    "network_side_attach_attempts_last_6h": 0,
+    "summary": "no attach attempts seen by any network; last known cells normal (power/field issue suspected)"
+   }
+  }
+ ]
+}
