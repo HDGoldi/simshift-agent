@@ -12,6 +12,7 @@ import argparse
 import json
 import os
 from dataclasses import asdict
+from typing import Callable
 
 from pydantic import BaseModel
 from strands import Agent, tool
@@ -52,7 +53,10 @@ def _bedrock(llm: BedrockModel, prompt: str, schema=None):
     return res.structured_output.model_dump() if schema else str(res).strip()
 
 
-def build_tools(twin: FleetTwin, approve: bool, llm: BedrockModel | None) -> list:
+def build_tools(twin: FleetTwin, approver: Callable[[str], bool], llm: BedrockModel | None) -> list:
+    """The six routed tools. `approver(proposal_id)` says whether a human approved that exact proposal."""
+    plans: dict[str, dict | None] = {}  # one Bedrock review per proposal, even if it is re-submitted after approval
+
     @tool
     def simulate_retry_with_backoff() -> dict:
         """Bounded backoff and re-attach on the current profile and operator (simulated)."""
@@ -77,15 +81,16 @@ def build_tools(twin: FleetTwin, approve: bool, llm: BedrockModel | None) -> lis
     def prepare_guarded_profile_transition() -> dict:
         """Bedrock plan -> deterministic gate + human approval -> virtual eIM enable -> verify -> rollback on failure."""
         target = next(p for p in twin.s["profiles"] if p != twin.s["active_profile"])
-        plan = None
-        if llm:
-            plan = _bedrock(llm, (
+        pid = proposal_id(twin, target)
+        if llm and pid not in plans:
+            plans[pid] = _bedrock(llm, (
                 "You review a proposed eSIM profile switch for a cohort of cellular IoT devices. This is a simulation. "
                 "Decide whether proceeding is advisable and list concrete risks. You do not authorize anything.\n"
                 f"Observed state: {json.dumps(twin.observe())}\nProfiles: {json.dumps(twin.get_profiles())}\n"
                 f"Proposed target: {target}"), ProfilePlan)
-        approval = proposal_id(twin, target) if approve else None  # scripted pre-approval of this exact proposal
-        return {"target": target, "bedrock_plan": plan, **guarded_profile_transition(twin, target, approval)}
+        approval = pid if approver(pid) else None
+        return {"target": target, "bedrock_plan": plans.get(pid),
+                **guarded_profile_transition(twin, target, approval)}
 
     @tool
     def defer_or_escalate() -> dict:
@@ -125,43 +130,90 @@ def make_router(decider) -> CapabilityAwareRouter:
                                  policy=exclusions, fallback=FALLBACK, read_only=READ_ONLY)
 
 
-def run(scenario_id: str, approve: bool = False, decider=None, use_bedrock: bool = True) -> dict:
-    twin = FleetTwin(scenario_id)
-    router = make_router(decider or DeciderClient(os.environ.get("DECIDER_URL", "http://127.0.0.1:8099")))
-    llm = BedrockModel(model_id=BEDROCK_MODEL, region_name=REGION, max_tokens=2048)
-    agent = Agent(model=llm, tools=build_tools(twin, approve, llm if use_bedrock else None),
-                  interventions=[router.gate(twin.observe)], callback_handler=None)
-    audit = watch_tool_calls(agent, twin)
-    initial, trace = twin.rates(), []
-    for step in range(1, MAX_STEPS + 1):
-        decision, result = router.step(agent, twin.observe())
+class Incident:
+    """One recovery session. Each step(): observe -> policy -> Decider -> exactly one gated Strands tool.
+    The CLI loop, the Bedrock orchestrator and the web UI all drive this same object."""
+
+    def __init__(self, scenario_id: str, approve: bool = False, decider=None, use_bedrock: bool = True):
+        self.scenario_id, self.pre_approved, self.use_bedrock = scenario_id, approve, use_bedrock
+        self.twin = twin = FleetTwin(scenario_id)
+        self.router = make_router(decider or DeciderClient(os.environ.get("DECIDER_URL", "http://127.0.0.1:8099")))
+        self.llm = BedrockModel(model_id=BEDROCK_MODEL, region_name=REGION, max_tokens=2048)
+        self.approved: set[str] = set()  # proposal ids a human approved during the session
+        self.agent = Agent(model=self.llm, tools=build_tools(twin, lambda pid: approve or pid in self.approved,
+                                                             self.llm if use_bedrock else None),
+                           interventions=[self.router.gate(twin.observe)], callback_handler=None)
+        self.audit = watch_tool_calls(self.agent, twin)
+        self.initial, self.trace = twin.rates(), []
+
+    def _record(self, decision, result, **extra) -> dict:
         text = result["content"][0]["text"]
-        trace.append({"step": step, "decision": asdict(decision), "tool": decision.tool, "tool_status": result["status"],
-                      "tool_result": json.loads(text) if result["status"] == "success" else text,
-                      "rates_after": twin.rates()})
-        if twin.service_restored() or decision.selected in TERMINAL:
-            break
-    else:  # step limit reached without a terminal action: hand off, never stop silently
-        result = agent.tool.defer_or_escalate()
-        trace.append({"step": MAX_STEPS + 1, "decision": None, "tool": TOOLS[FALLBACK], "tool_status": result["status"],
-                      "tool_result": json.loads(result["content"][0]["text"]), "rates_after": twin.rates(),
-                      "note": f"step limit {MAX_STEPS} reached"})
-    outcome = {"restored": twin.service_restored(), "initial_rates": initial, "final_rates": twin.rates(),
-               "active_profile": twin.s["active_profile"], "serving_operator": twin.s["serving_operator"],
-               "steps": len(trace), "simulated_minutes": twin.simulated_minutes(),
-               "profile_changes": twin.profile_changes, **audit_counts(audit)}
-    explanation = None
-    if use_bedrock:
-        explanation = _bedrock(llm, (
-            "Explain in at most 120 words, for a NOC engineer, what this simulated recovery agent did and why. "
-            "Separate what was observed from what is uncertain. Do not invent facts beyond the trace.\n"
-            + json.dumps({"trace": [{k: t[k] for k in ("step", "tool", "tool_result")} |
-                                    ({"decider": t["decision"]["raw"], "route": t["decision"]["route"],
-                                      "excluded": t["decision"]["excluded"]} if t["decision"] else {"note": t["note"]})
-                                    for t in trace], "outcome": outcome})))
-    return {"scenario": scenario_id, "title": SCENARIOS[scenario_id]["title"], "approved": approve,
-            "bedrock_model": BEDROCK_MODEL if use_bedrock else None, "trace": trace, "outcome": outcome,
-            "explanation": explanation, "events": twin.events}
+        t = {"step": len(self.trace) + 1, "decision": decision and asdict(decision),
+             "tool": decision.tool if decision else extra.pop("tool"), "tool_status": result["status"],
+             "tool_result": json.loads(text) if result["status"] == "success" else text,
+             "rates_after": self.twin.rates(), **extra}
+        self.trace.append(t)
+        return t
+
+    @property
+    def pending_approval(self) -> str | None:
+        """Proposal id waiting for a human, if the last step stopped only at the approval check."""
+        last = self.trace[-1] if self.trace else None
+        gate = last and isinstance(last["tool_result"], dict) and last["tool_result"].get("gate")
+        return gate["proposal_id"] if gate and gate["failed"] == ["human_approval"] else None
+
+    @property
+    def done(self) -> bool:
+        last = self.trace[-1] if self.trace else None
+        return bool(self.twin.service_restored() or (last and (last["decision"] is None or last["decision"]["selected"]
+                                                                in TERMINAL)))
+
+    def step(self) -> dict:
+        if len(self.trace) >= MAX_STEPS:  # step limit without a terminal action: hand off, never stop silently
+            return self._record(None, self.agent.tool.defer_or_escalate(), tool=TOOLS[FALLBACK],
+                                note=f"step limit {MAX_STEPS} reached")
+        decision, result = self.router.step(self.agent, self.twin.observe())
+        return self._record(decision, result)
+
+    def resolve_approval(self, approve: bool) -> dict:
+        """A human answers the pending proposal. Approval re-submits that exact proposal through the same gate."""
+        pid = self.pending_approval
+        if pid is None:
+            raise ValueError("no proposal is waiting for approval")
+        if not approve:
+            return self._record(None, self.agent.tool.defer_or_escalate(), tool=TOOLS[FALLBACK],
+                                note=f"operator declined proposal {pid}")
+        self.approved.add(pid)
+        return self._record(None, self.agent.tool.prepare_guarded_profile_transition(),
+                            tool=TOOLS["evaluate_profile_change"], note=f"operator approved proposal {pid}")
+
+    def outcome(self) -> dict:
+        t = self.twin
+        return {"restored": t.service_restored(), "initial_rates": self.initial, "final_rates": t.rates(),
+                "active_profile": t.s["active_profile"], "serving_operator": t.s["serving_operator"],
+                "steps": len(self.trace), "simulated_minutes": t.simulated_minutes(),
+                "profile_changes": t.profile_changes, **audit_counts(self.audit)}
+
+    def result(self, explain: bool | None = None) -> dict:
+        outcome, explanation = self.outcome(), None
+        if self.use_bedrock if explain is None else explain:
+            explanation = _bedrock(self.llm, (
+                "Explain in at most 120 words, for a NOC engineer, what this simulated recovery agent did and why. "
+                "Separate what was observed from what is uncertain. Do not invent facts beyond the trace.\n"
+                + json.dumps({"trace": [{k: t[k] for k in ("step", "tool", "tool_result")} |
+                                        ({"decider": t["decision"]["raw"], "route": t["decision"]["route"],
+                                          "excluded": t["decision"]["excluded"]} if t["decision"] else {"note": t["note"]})
+                                        for t in self.trace], "outcome": outcome})))
+        return {"scenario": self.scenario_id, "title": SCENARIOS[self.scenario_id]["title"],
+                "approved": self.pre_approved, "bedrock_model": BEDROCK_MODEL if self.use_bedrock else None,
+                "trace": self.trace, "outcome": outcome, "explanation": explanation, "events": self.twin.events}
+
+
+def run(scenario_id: str, approve: bool = False, decider=None, use_bedrock: bool = True) -> dict:
+    inc = Incident(scenario_id, approve, decider, use_bedrock)
+    while not inc.done:
+        inc.step()
+    return inc.result()
 
 
 def _print(r: dict, decider_source: str) -> None:

@@ -1,0 +1,206 @@
+{
+ "scenario": "DE_OPERATOR",
+ "title": "Germany: primary network degraded; allowed alternative operator on same profile",
+ "approved": false,
+ "bedrock_model": "eu.anthropic.claude-haiku-5-5",
+ "trace": [
+  {
+   "step": 1,
+   "decision": {
+    "question": "Given the cellular connectivity symptoms, diagnostic evidence so far, and only these admissible tools, which next tool is most useful for safely advancing service restoration? Do not assume an unverified recovery path works.",
+    "state": {
+     "incident": "Attach failures on primary network",
+     "country": "DE",
+     "affected_devices": 8400,
+     "attach_success_rate": 0.04,
+     "data_session_rate": 0.03,
+     "app_ack_rate": 0.0,
+     "heartbeat_rate": 0.04,
+     "serving_operator": "DE-NET-1",
+     "active_profile": "profile_A",
+     "other_operator_allowed_on_active_profile": true,
+     "alternative_profile_installed": true,
+     "management_path_reachable": false,
+     "recent_firmware_change": false,
+     "attempted_retries": 1,
+     "diagnostics": {}
+    },
+    "eligible": {
+     "retry_connection": "Bounded backoff and re-attach on the current profile and operator; suits brief or improving disruptions",
+     "try_allowed_operator": "Reselect another operator the ACTIVE profile already permits (no profile change); suits a failing serving network",
+     "investigate_data_path": "Read-only: check network-side data sessions, APN and application ingestion; suits devices that register but whose telemetry fails",
+     "escalate_or_wait": "Hold and hand off to a human with the collected evidence; suits cases no admissible remote action can fix"
+    },
+    "excluded": {
+     "investigate_device": "devices unreachable; no modem logs retrievable",
+     "evaluate_profile_change": "no management path to the IPA; OTA profile change impossible"
+    },
+    "raw": {
+     "choice": "try_allowed_operator",
+     "probabilities": {
+      "retry_connection": 0.1943,
+      "try_allowed_operator": 0.6,
+      "investigate_data_path": 0.1101,
+      "escalate_or_wait": 0.0956
+     },
+     "confidence": 0.4666,
+     "model": "strands-decider-2B-qwen3.5-v1-2610",
+     "latency_ms": 139.57,
+     "client_latency_ms": 163.4
+    },
+    "selected": "investigate_data_path",
+    "route": "gather_evidence",
+    "reason": "confidence 0.47 < 0.5: most probable read-only option",
+    "tool": "query_apn_session_app_diagnostics"
+   },
+   "tool": "query_apn_session_app_diagnostics",
+   "tool_status": "success",
+   "tool_result": {
+    "seq": 1,
+    "kind": "diagnostics_data_path",
+    "result": {
+     "pdn_sessions": "none",
+     "summary": "no data sessions; attach failing on DE-NET-1"
+    }
+   },
+   "rates_after": {
+    "attach_success_rate": 0.04,
+    "data_session_rate": 0.03,
+    "app_ack_rate": 0.0,
+    "heartbeat_rate": 0.04
+   }
+  },
+  {
+   "step": 2,
+   "decision": {
+    "question": "Given the cellular connectivity symptoms, diagnostic evidence so far, and only these admissible tools, which next tool is most useful for safely advancing service restoration? Do not assume an unverified recovery path works.",
+    "state": {
+     "incident": "Attach failures on primary network",
+     "country": "DE",
+     "affected_devices": 8400,
+     "attach_success_rate": 0.04,
+     "data_session_rate": 0.03,
+     "app_ack_rate": 0.0,
+     "heartbeat_rate": 0.04,
+     "serving_operator": "DE-NET-1",
+     "active_profile": "profile_A",
+     "other_operator_allowed_on_active_profile": true,
+     "alternative_profile_installed": true,
+     "management_path_reachable": false,
+     "recent_firmware_change": false,
+     "attempted_retries": 1,
+     "diagnostics": {
+      "data_path": {
+       "pdn_sessions": "none",
+       "summary": "no data sessions; attach failing on DE-NET-1"
+      }
+     }
+    },
+    "eligible": {
+     "retry_connection": "Bounded backoff and re-attach on the current profile and operator; suits brief or improving disruptions",
+     "try_allowed_operator": "Reselect another operator the ACTIVE profile already permits (no profile change); suits a failing serving network",
+     "escalate_or_wait": "Hold and hand off to a human with the collected evidence; suits cases no admissible remote action can fix"
+    },
+    "excluded": {
+     "investigate_device": "devices unreachable; no modem logs retrievable",
+     "evaluate_profile_change": "no management path to the IPA; OTA profile change impossible",
+     "investigate_data_path": "evidence already collected"
+    },
+    "raw": {
+     "choice": "try_allowed_operator",
+     "probabilities": {
+      "retry_connection": 0.1831,
+      "try_allowed_operator": 0.7488,
+      "escalate_or_wait": 0.0681
+     },
+     "confidence": 0.6232,
+     "model": "strands-decider-2B-qwen3.5-v1-2610",
+     "latency_ms": 131.76,
+     "client_latency_ms": 135.6
+    },
+    "selected": "try_allowed_operator",
+    "route": "act",
+    "reason": "confidence 0.62 >= 0.5",
+    "tool": "simulate_operator_reselection"
+   },
+   "tool": "simulate_operator_reselection",
+   "tool_status": "success",
+   "tool_result": {
+    "seq": 2,
+    "kind": "operator_reselection",
+    "ok": true,
+    "from_operator": "DE-NET-1",
+    "to_operator": "DE-NET-2",
+    "restored": true,
+    "rates": {
+     "attach_success_rate": 0.997,
+     "data_session_rate": 0.99,
+     "app_ack_rate": 0.995,
+     "heartbeat_rate": 0.99
+    }
+   },
+   "rates_after": {
+    "attach_success_rate": 0.997,
+    "data_session_rate": 0.99,
+    "app_ack_rate": 0.995,
+    "heartbeat_rate": 0.99
+   }
+  }
+ ],
+ "outcome": {
+  "restored": true,
+  "initial_rates": {
+   "attach_success_rate": 0.04,
+   "data_session_rate": 0.03,
+   "app_ack_rate": 0.0,
+   "heartbeat_rate": 0.04
+  },
+  "final_rates": {
+   "attach_success_rate": 0.997,
+   "data_session_rate": 0.99,
+   "app_ack_rate": 0.995,
+   "heartbeat_rate": 0.99
+  },
+  "active_profile": "profile_A",
+  "serving_operator": "DE-NET-2",
+  "steps": 2,
+  "simulated_minutes": 20,
+  "profile_changes": 0,
+  "forbidden_executions": 0,
+  "blocked_calls": 0
+ },
+ "explanation": null,
+ "events": [
+  {
+   "seq": 1,
+   "kind": "diagnostics_data_path",
+   "result": {
+    "pdn_sessions": "none",
+    "summary": "no data sessions; attach failing on DE-NET-1"
+   }
+  },
+  {
+   "seq": 2,
+   "kind": "operator_reselection",
+   "ok": true,
+   "from_operator": "DE-NET-1",
+   "to_operator": "DE-NET-2",
+   "restored": true,
+   "rates": {
+    "attach_success_rate": 0.997,
+    "data_session_rate": 0.99,
+    "app_ack_rate": 0.995,
+    "heartbeat_rate": 0.99
+   }
+  }
+ ],
+ "mode": "orchestrated",
+ "report": "**What happened**\nThis is a simulated fleet, so all results below are simulated. Attach failures hit 8,400 devices in DE on DE-NET-1. Attach success was 0.04 and app ack was 0.0. The management path was unreachable, and there were no recent firmware changes.\n\n**Decisions**\n- **Step 1:** Policy removed `investigate_device` (devices unreachable, no modem logs) and `evaluate_profile_change` (no management path, so no OTA change). The model chose `try_allowed_operator` at confidence 0.47, below the 0.5 threshold, so it routed to gather_evidence. The tool was `query_apn_session_app_diagnostics`, which returned no PDN sessions and attach failing on DE-NET-1. Rates did not change.\n- **Step 2:** Policy removed `investigate_device` and `evaluate_profile_change`, plus `investigate_data_path` because its evidence was already collected. The model chose `try_allowed_operator` at confidence 0.62 and routed to act. The tool `simulate_operator_reselection` moved devices from DE-NET-1 to DE-NET-2 and reported success.\n\n**Outcome**\nRestored. After the last step, attach success was 0.997, data session 0.99, app ack 0.995, and heartbeat 0.99. The active profile remained profile_A. No profile change was made, so no approval was needed or sought.\n\n**Next**\n- Confirm DE-NET-2 stability over a longer window, since this was one reselection.\n- Investigate the root cause on DE-NET-1 once management access is restored.\n- Restore the management path so the device-side logs and profile options become available.",
+ "bedrock_usage": {
+  "inputTokens": 5028,
+  "outputTokens": 800,
+  "totalTokens": 5828
+ },
+ "advance_calls": 2,
+ "decider_source": "live http://127.0.0.1:8099"
+}

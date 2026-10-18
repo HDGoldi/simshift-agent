@@ -121,7 +121,9 @@ def test_off_menu_choice_never_reaches_the_eim():
 SAMPLE_RUNS = os.path.join(os.path.dirname(__file__), "..", "docs", "sample-runs")
 
 
-@pytest.mark.parametrize("name", sorted(f for f in os.listdir(SAMPLE_RUNS) if f.endswith(".json")))
+@pytest.mark.parametrize("name", sorted(f for d in ("", "orchestrated") for f in
+                                         (os.path.join(d, x) for x in os.listdir(os.path.join(SAMPLE_RUNS, d)))
+                                         if f.endswith(".json")))
 def test_published_runs_replay_identically(name):
     from patterns.capability_aware_router.router import ReplayDecider
     rec = json.load(open(os.path.join(SAMPLE_RUNS, name)))
@@ -145,7 +147,7 @@ def test_audit_counts_a_forbidden_execution_when_the_gate_is_missing():
     gated = run("OFFLINE", decider=ScriptedDecider(["investigate_data_path"]), use_bedrock=False)
     assert gated["outcome"]["forbidden_executions"] == 0
     bare = Agent(model=BedrockModel(model_id="unused", region_name="us-east-1"),
-                 tools=build_tools(twin, False, None), callback_handler=None)  # no policy gate
+                 tools=build_tools(twin, lambda pid: False, None), callback_handler=None)  # no policy gate
     audit = watch_tool_calls(bare, twin)
     bare.tool.query_firmware_modem_diagnostics()
     assert audit_counts(audit) == {"forbidden_executions": 1, "blocked_calls": 0}
@@ -157,9 +159,24 @@ def test_gate_denial_is_counted_as_blocked():
     from strands import Agent
     from strands.models import BedrockModel
     twin = FleetTwin("OFFLINE")
-    agent = Agent(model=BedrockModel(model_id="unused", region_name="us-east-1"), tools=build_tools(twin, True, None),
+    agent = Agent(model=BedrockModel(model_id="unused", region_name="us-east-1"), tools=build_tools(twin, lambda pid: True, None),
                   interventions=[make_router(None).gate(twin.observe)], callback_handler=None)
     audit = watch_tool_calls(agent, twin)
     res = agent.tool.prepare_guarded_profile_transition()
     assert res["status"] == "error" and audit_counts(audit) == {"forbidden_executions": 0, "blocked_calls": 1}
     assert not any(e["kind"].startswith("eim_") for e in twin.events)
+
+
+def test_deferred_approval():
+    from simshift.agent import Incident
+    from simshift.validate import problems
+    for approve in (True, False):
+        inc = Incident("BR_PROFILE", decider=ScriptedDecider(["investigate_device", "evaluate_profile_change"]),
+                       use_bedrock=False)
+        while not inc.done:
+            inc.step()
+        pid = inc.pending_approval
+        assert pid and inc.twin.s["active_profile"] == "profile_A"
+        last = inc.resolve_approval(approve)
+        assert inc.done and inc.pending_approval is None and pid in last["note"]
+        assert inc.twin.service_restored() == approve and problems(inc.result()) == []

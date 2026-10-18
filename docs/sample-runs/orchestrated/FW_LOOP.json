@@ -1,0 +1,301 @@
+{
+ "scenario": "FW_LOOP",
+ "title": "US: devices keep dropping off after a firmware rollout",
+ "approved": false,
+ "bedrock_model": "eu.anthropic.claude-haiku-5-5",
+ "trace": [
+  {
+   "step": 1,
+   "decision": {
+    "question": "Given the cellular connectivity symptoms, diagnostic evidence so far, and only these admissible tools, which next tool is most useful for safely advancing service restoration? Do not assume an unverified recovery path works.",
+    "state": {
+     "incident": "Devices dropping off the network repeatedly",
+     "country": "US",
+     "affected_devices": 5400,
+     "attach_success_rate": 0.41,
+     "data_session_rate": 0.38,
+     "app_ack_rate": 0.37,
+     "heartbeat_rate": 0.42,
+     "serving_operator": "US-NET-1",
+     "active_profile": "profile_A",
+     "other_operator_allowed_on_active_profile": false,
+     "alternative_profile_installed": true,
+     "management_path_reachable": true,
+     "recent_firmware_change": true,
+     "attach_trend": "flapping",
+     "attempted_retries": 2,
+     "diagnostics": {}
+    },
+    "eligible": {
+     "retry_connection": "Bounded backoff and re-attach on the current profile and operator; suits brief or improving disruptions",
+     "investigate_device": "Read-only: pull modem and firmware diagnostics from the devices",
+     "investigate_data_path": "Read-only: check network-side data sessions, APN and application ingestion; suits devices that register but whose telemetry fails",
+     "escalate_or_wait": "Hold and hand off to a human with the collected evidence; suits cases no admissible remote action can fix"
+    },
+    "excluded": {
+     "try_allowed_operator": "active profile permits no other operator in coverage",
+     "evaluate_profile_change": "needs modem evidence (registration reject cause) before a profile switch"
+    },
+    "raw": {
+     "choice": "retry_connection",
+     "probabilities": {
+      "retry_connection": 0.5394,
+      "investigate_device": 0.1815,
+      "investigate_data_path": 0.1348,
+      "escalate_or_wait": 0.1443
+     },
+     "confidence": 0.3859,
+     "model": "strands-decider-2B-qwen3.5-v1-2610",
+     "latency_ms": 124.77,
+     "client_latency_ms": 148.8
+    },
+    "selected": "investigate_device",
+    "route": "gather_evidence",
+    "reason": "confidence 0.39 < 0.5: most probable read-only option",
+    "tool": "query_firmware_modem_diagnostics"
+   },
+   "tool": "query_firmware_modem_diagnostics",
+   "tool_status": "success",
+   "tool_result": {
+    "seq": 1,
+    "kind": "diagnostics_device",
+    "result": {
+     "available": true,
+     "firmware_uniform": true,
+     "modem_resets_per_day": 14.2,
+     "reject_cause": null,
+     "summary": "modem reset loop on the firmware rolled out before onset; registration accepted between resets"
+    }
+   },
+   "rates_after": {
+    "attach_success_rate": 0.41,
+    "data_session_rate": 0.38,
+    "app_ack_rate": 0.37,
+    "heartbeat_rate": 0.42
+   }
+  },
+  {
+   "step": 2,
+   "decision": {
+    "question": "Given the cellular connectivity symptoms, diagnostic evidence so far, and only these admissible tools, which next tool is most useful for safely advancing service restoration? Do not assume an unverified recovery path works.",
+    "state": {
+     "incident": "Devices dropping off the network repeatedly",
+     "country": "US",
+     "affected_devices": 5400,
+     "attach_success_rate": 0.41,
+     "data_session_rate": 0.38,
+     "app_ack_rate": 0.37,
+     "heartbeat_rate": 0.42,
+     "serving_operator": "US-NET-1",
+     "active_profile": "profile_A",
+     "other_operator_allowed_on_active_profile": false,
+     "alternative_profile_installed": true,
+     "management_path_reachable": true,
+     "recent_firmware_change": true,
+     "attach_trend": "flapping",
+     "attempted_retries": 2,
+     "diagnostics": {
+      "device": {
+       "available": true,
+       "firmware_uniform": true,
+       "modem_resets_per_day": 14.2,
+       "reject_cause": null,
+       "summary": "modem reset loop on the firmware rolled out before onset; registration accepted between resets"
+      }
+     }
+    },
+    "eligible": {
+     "investigate_data_path": "Read-only: check network-side data sessions, APN and application ingestion; suits devices that register but whose telemetry fails",
+     "escalate_or_wait": "Hold and hand off to a human with the collected evidence; suits cases no admissible remote action can fix"
+    },
+    "excluded": {
+     "retry_connection": "modem reset loop on the devices; re-attaching cannot help",
+     "try_allowed_operator": "active profile permits no other operator in coverage",
+     "evaluate_profile_change": "needs modem evidence (registration reject cause) before a profile switch",
+     "investigate_device": "evidence already collected"
+    },
+    "raw": {
+     "choice": "escalate_or_wait",
+     "probabilities": {
+      "investigate_data_path": 0.3771,
+      "escalate_or_wait": 0.6229
+     },
+     "confidence": 0.2458,
+     "model": "strands-decider-2B-qwen3.5-v1-2610",
+     "latency_ms": 125.07,
+     "client_latency_ms": 127.2
+    },
+    "selected": "investigate_data_path",
+    "route": "gather_evidence",
+    "reason": "confidence 0.25 < 0.5: most probable read-only option",
+    "tool": "query_apn_session_app_diagnostics"
+   },
+   "tool": "query_apn_session_app_diagnostics",
+   "tool_status": "success",
+   "tool_result": {
+    "seq": 2,
+    "kind": "diagnostics_data_path",
+    "result": {
+     "pdn_sessions": "flapping",
+     "apn": "ok",
+     "summary": "sessions drop and re-establish repeatedly; APN and ingestion healthy"
+    }
+   },
+   "rates_after": {
+    "attach_success_rate": 0.41,
+    "data_session_rate": 0.38,
+    "app_ack_rate": 0.37,
+    "heartbeat_rate": 0.42
+   }
+  },
+  {
+   "step": 3,
+   "decision": {
+    "question": "Given the cellular connectivity symptoms, diagnostic evidence so far, and only these admissible tools, which next tool is most useful for safely advancing service restoration? Do not assume an unverified recovery path works.",
+    "state": {
+     "incident": "Devices dropping off the network repeatedly",
+     "country": "US",
+     "affected_devices": 5400,
+     "attach_success_rate": 0.41,
+     "data_session_rate": 0.38,
+     "app_ack_rate": 0.37,
+     "heartbeat_rate": 0.42,
+     "serving_operator": "US-NET-1",
+     "active_profile": "profile_A",
+     "other_operator_allowed_on_active_profile": false,
+     "alternative_profile_installed": true,
+     "management_path_reachable": true,
+     "recent_firmware_change": true,
+     "attach_trend": "flapping",
+     "attempted_retries": 2,
+     "diagnostics": {
+      "device": {
+       "available": true,
+       "firmware_uniform": true,
+       "modem_resets_per_day": 14.2,
+       "reject_cause": null,
+       "summary": "modem reset loop on the firmware rolled out before onset; registration accepted between resets"
+      },
+      "data_path": {
+       "pdn_sessions": "flapping",
+       "apn": "ok",
+       "summary": "sessions drop and re-establish repeatedly; APN and ingestion healthy"
+      }
+     }
+    },
+    "eligible": {
+     "escalate_or_wait": "Hold and hand off to a human with the collected evidence; suits cases no admissible remote action can fix"
+    },
+    "excluded": {
+     "retry_connection": "modem reset loop on the devices; re-attaching cannot help",
+     "try_allowed_operator": "active profile permits no other operator in coverage",
+     "evaluate_profile_change": "needs modem evidence (registration reject cause) before a profile switch",
+     "investigate_device": "evidence already collected",
+     "investigate_data_path": "evidence already collected"
+    },
+    "raw": null,
+    "selected": "escalate_or_wait",
+    "route": "fallback",
+    "reason": "only the fallback is admissible",
+    "tool": "defer_or_escalate"
+   },
+   "tool": "defer_or_escalate",
+   "tool_status": "success",
+   "tool_result": {
+    "escalated": true,
+    "evidence": {
+     "device": {
+      "available": true,
+      "firmware_uniform": true,
+      "modem_resets_per_day": 14.2,
+      "reject_cause": null,
+      "summary": "modem reset loop on the firmware rolled out before onset; registration accepted between resets"
+     },
+     "data_path": {
+      "pdn_sessions": "flapping",
+      "apn": "ok",
+      "summary": "sessions drop and re-establish repeatedly; APN and ingestion healthy"
+     }
+    }
+   },
+   "rates_after": {
+    "attach_success_rate": 0.41,
+    "data_session_rate": 0.38,
+    "app_ack_rate": 0.37,
+    "heartbeat_rate": 0.42
+   }
+  }
+ ],
+ "outcome": {
+  "restored": false,
+  "initial_rates": {
+   "attach_success_rate": 0.41,
+   "data_session_rate": 0.38,
+   "app_ack_rate": 0.37,
+   "heartbeat_rate": 0.42
+  },
+  "final_rates": {
+   "attach_success_rate": 0.41,
+   "data_session_rate": 0.38,
+   "app_ack_rate": 0.37,
+   "heartbeat_rate": 0.42
+  },
+  "active_profile": "profile_A",
+  "serving_operator": "US-NET-1",
+  "steps": 3,
+  "simulated_minutes": 85,
+  "profile_changes": 0,
+  "forbidden_executions": 0,
+  "blocked_calls": 0
+ },
+ "explanation": null,
+ "events": [
+  {
+   "seq": 1,
+   "kind": "diagnostics_device",
+   "result": {
+    "available": true,
+    "firmware_uniform": true,
+    "modem_resets_per_day": 14.2,
+    "reject_cause": null,
+    "summary": "modem reset loop on the firmware rolled out before onset; registration accepted between resets"
+   }
+  },
+  {
+   "seq": 2,
+   "kind": "diagnostics_data_path",
+   "result": {
+    "pdn_sessions": "flapping",
+    "apn": "ok",
+    "summary": "sessions drop and re-establish repeatedly; APN and ingestion healthy"
+   }
+  },
+  {
+   "seq": 3,
+   "kind": "escalated",
+   "evidence": {
+    "device": {
+     "available": true,
+     "firmware_uniform": true,
+     "modem_resets_per_day": 14.2,
+     "reject_cause": null,
+     "summary": "modem reset loop on the firmware rolled out before onset; registration accepted between resets"
+    },
+    "data_path": {
+     "pdn_sessions": "flapping",
+     "apn": "ok",
+     "summary": "sessions drop and re-establish repeatedly; APN and ingestion healthy"
+    }
+   }
+  }
+ ],
+ "mode": "orchestrated",
+ "report": "**What happened** (simulated environment): 5,400 devices on US-NET-1 are dropping off repeatedly. Attach success was 0.41, data session 0.38, app ack 0.37, heartbeat 0.42, with flapping attach. A firmware change was rolled out before onset.\n\n**Decisions**\n- **Step 1:** Policy removed try_allowed_operator (profile permits no other operator) and evaluate_profile_change (needs reject-cause evidence). Chose retry_connection, confidence 0.39, routed to gather_evidence. Device diagnostics showed a modem reset loop (14.2 resets/day), no reject cause, uniform firmware.\n- **Step 2:** Policy also removed retry_connection (re-attach cannot fix a reset loop) and investigate_device (already done). Chose escalate_or_wait, confidence 0.25, routed to gather_evidence. Data-path diagnostics showed flapping PDN sessions, with APN and ingestion healthy.\n- **Step 3:** Only the fallback was admissible. defer_or_escalate ran and escalated the incident.\n\n**Outcome**\nRates after the last step were unchanged: attach 0.41, data 0.38, ack 0.37, heartbeat 0.42. Not restored. No profile change was made. The alternative profile stays uninstalled from use, since no reject cause was recorded to justify a switch.\n\n**Next**\n- Engineering should review the firmware rolled out before onset and consider rollback of the modem firmware.\n- Obtain registration reject-cause logs, which would be needed to evaluate a profile change.\n- Monitor the escalation.",
+ "bedrock_usage": {
+  "inputTokens": 7511,
+  "outputTokens": 757,
+  "totalTokens": 8268
+ },
+ "advance_calls": 3,
+ "decider_source": "live http://127.0.0.1:8099"
+}

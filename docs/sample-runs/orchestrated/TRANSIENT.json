@@ -1,0 +1,123 @@
+{
+ "scenario": "TRANSIENT",
+ "title": "France: short burst of attach failures after a cell site restart",
+ "approved": false,
+ "bedrock_model": "eu.anthropic.claude-haiku-5-5",
+ "trace": [
+  {
+   "step": 1,
+   "decision": {
+    "question": "Given the cellular connectivity symptoms, diagnostic evidence so far, and only these admissible tools, which next tool is most useful for safely advancing service restoration? Do not assume an unverified recovery path works.",
+    "state": {
+     "incident": "Short burst of attach failures",
+     "country": "FR",
+     "affected_devices": 2100,
+     "attach_success_rate": 0.62,
+     "data_session_rate": 0.59,
+     "app_ack_rate": 0.58,
+     "heartbeat_rate": 0.63,
+     "serving_operator": "FR-NET-1",
+     "active_profile": "profile_A",
+     "other_operator_allowed_on_active_profile": false,
+     "alternative_profile_installed": true,
+     "management_path_reachable": true,
+     "recent_firmware_change": false,
+     "attach_trend": "improving",
+     "attempted_retries": 0,
+     "diagnostics": {}
+    },
+    "eligible": {
+     "retry_connection": "Bounded backoff and re-attach on the current profile and operator; suits brief or improving disruptions",
+     "investigate_device": "Read-only: pull modem and firmware diagnostics from the devices",
+     "investigate_data_path": "Read-only: check network-side data sessions, APN and application ingestion; suits devices that register but whose telemetry fails",
+     "escalate_or_wait": "Hold and hand off to a human with the collected evidence; suits cases no admissible remote action can fix"
+    },
+    "excluded": {
+     "try_allowed_operator": "active profile permits no other operator in coverage",
+     "evaluate_profile_change": "needs modem evidence (registration reject cause) before a profile switch"
+    },
+    "raw": {
+     "choice": "retry_connection",
+     "probabilities": {
+      "retry_connection": 0.8428,
+      "investigate_device": 0.0552,
+      "investigate_data_path": 0.0526,
+      "escalate_or_wait": 0.0494
+     },
+     "confidence": 0.7904,
+     "model": "strands-decider-2B-qwen3.5-v1-2610",
+     "latency_ms": 122.49,
+     "client_latency_ms": 144.3
+    },
+    "selected": "retry_connection",
+    "route": "act",
+    "reason": "confidence 0.79 >= 0.5",
+    "tool": "simulate_retry_with_backoff"
+   },
+   "tool": "simulate_retry_with_backoff",
+   "tool_status": "success",
+   "tool_result": {
+    "seq": 1,
+    "kind": "retry",
+    "restored": true,
+    "rates": {
+     "attach_success_rate": 0.997,
+     "data_session_rate": 0.99,
+     "app_ack_rate": 0.995,
+     "heartbeat_rate": 0.99
+    }
+   },
+   "rates_after": {
+    "attach_success_rate": 0.997,
+    "data_session_rate": 0.99,
+    "app_ack_rate": 0.995,
+    "heartbeat_rate": 0.99
+   }
+  }
+ ],
+ "outcome": {
+  "restored": true,
+  "initial_rates": {
+   "attach_success_rate": 0.62,
+   "data_session_rate": 0.59,
+   "app_ack_rate": 0.58,
+   "heartbeat_rate": 0.63
+  },
+  "final_rates": {
+   "attach_success_rate": 0.997,
+   "data_session_rate": 0.99,
+   "app_ack_rate": 0.995,
+   "heartbeat_rate": 0.99
+  },
+  "active_profile": "profile_A",
+  "serving_operator": "FR-NET-1",
+  "steps": 1,
+  "simulated_minutes": 5,
+  "profile_changes": 0,
+  "forbidden_executions": 0,
+  "blocked_calls": 0
+ },
+ "explanation": null,
+ "events": [
+  {
+   "seq": 1,
+   "kind": "retry",
+   "restored": true,
+   "rates": {
+    "attach_success_rate": 0.997,
+    "data_session_rate": 0.99,
+    "app_ack_rate": 0.995,
+    "heartbeat_rate": 0.99
+   }
+  }
+ ],
+ "mode": "orchestrated",
+ "report": "**What happened**\nThis is a simulated FR incident affecting 2,100 devices on FR-NET-1 under profile_A. At the start, attach success was 0.62, data session 0.59, app ack 0.58 and heartbeat 0.63. No firmware change was recorded, and the attach trend was already improving.\n\n**Decisions**\n- **Step 1:** Policy removed `try_allowed_operator` (the active profile permits no other operator in coverage) and `evaluate_profile_change` (it needs modem registration-reject evidence first). The decision model chose `retry_connection` with 0.79 confidence, routed to \"act\" (threshold 0.5). It ran `simulate_retry_with_backoff`, which succeeded and was marked terminal.\n\n**Outcome**\n- Final rates: attach 0.997, data session 0.99, app ack 0.995, heartbeat 0.99. The fleet is restored.\n- No profile change was made, so no approval was needed. profile_A remains active.\n\n**Next**\n- No further action is needed to restore service.\n- Since no reject-cause evidence was collected, the root cause of the attach burst is unknown. Check the modem registration-reject causes before closing the incident, so a recurrence can be diagnosed.\n- Watch attach success for a short period to confirm it holds.\n\n*Everything here is simulated.*",
+ "bedrock_usage": {
+  "inputTokens": 3179,
+  "outputTokens": 555,
+  "totalTokens": 3734
+ },
+ "advance_calls": 1,
+ "decider_source": "live http://127.0.0.1:8099"
+}

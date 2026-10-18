@@ -19,9 +19,12 @@ def problems(run: dict) -> list[str]:
     allowed_gates = 0
     for t in run["trace"]:
         d, at = t["decision"], f"step {t['step']}"
-        if d is None:
-            if t["tool"] != TOOLS["escalate_or_wait"]:
-                out.append(f"{at}: a step without a decision must be the escalation")
+        if d is None:  # no model decision: step-limit or declined-approval escalation, or a human approval
+            approval = t.get("note", "").startswith("operator approved") and t["tool"] == TOOLS["evaluate_profile_change"]
+            if t["tool"] != TOOLS["escalate_or_wait"] and not approval:
+                out.append(f"{at}: a step without a decision must be an escalation or a human approval")
+            gate = t["tool_result"].get("gate") if isinstance(t["tool_result"], dict) else None
+            allowed_gates += bool(gate and gate["allowed"])
             continue
         if t["tool"] != TOOLS[d["selected"]] or d["selected"] not in d["eligible"]:
             out.append(f"{at}: executed tool {t['tool']} is not the routed admissible option {d['selected']}")
