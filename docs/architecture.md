@@ -86,4 +86,7 @@ Decider's options beforehand:
 - the fleet owner authorizes switching;
 - a human approved.
 
+Independently of the gate, the virtual eIM refuses an enable command that carries no approval, and one it cannot
+deliver because the management path is down. It does not repeat the gate's other checks.
+
 Retries are bounded at 5 and excluded once registration is healthy. Read-only diagnostics run once per incident. The loop stops after 6 steps and escalates.

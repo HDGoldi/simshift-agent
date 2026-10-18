@@ -1,8 +1,9 @@
 # Measurements (what was actually observed)
 
 All numbers below were measured on 2026-10-18. They are single runs or small samples, **not a benchmark**.
-The agent and Decider are not hosted on AWS yet; only the Bedrock calls run on AWS. This page will be updated once
-the AWS deployment exists.
+The agent and Decider are not hosted on AWS yet; only the Bedrock calls run on AWS. Not yet verified: Decider latency
+and memory on AWS hardware, and the AgentCore Runtime deployment. This page will be updated once the AWS deployment
+exists.
 
 ## Decider inference (local)
 

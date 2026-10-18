@@ -212,8 +212,10 @@ class FleetTwin:
                 "installed": {p: {"operators": v["operators"], "enabled": p == s["active_profile"]}
                               for p, v in s["profiles"].items()}}
 
-    def enable_profile(self, target: str, idempotency_key: str) -> dict:
-        """Simulator-only. Caller (policy gate) must have authorized it; this still refuses if unreachable."""
+    def enable_profile(self, target: str, idempotency_key: str, *, approved: bool) -> dict:
+        """Simulator-only. Independent of the policy gate, the virtual eIM refuses unapproved or undeliverable commands."""
+        if not approved:  # not cached: a later approved attempt with the same key must really execute
+            return self._log("eim_enable_profile", ok=False, reason="no operator approval; command not sent")
         if idempotency_key in self.commands:
             return self.commands[idempotency_key]
         s = self.s

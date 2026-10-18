@@ -17,7 +17,7 @@ from pydantic import BaseModel
 from strands import Agent, tool
 from strands.models import BedrockModel
 
-from patterns.capability_aware_router.router import CapabilityAwareRouter, DeciderClient
+from patterns.capability_aware_router.router import CapabilityAwareRouter, DeciderClient, ReplayDecider
 
 from .policy import FALLBACK, OPTIONS, READ_ONLY, exclusions, guarded_profile_transition
 from .simulator import SCENARIOS, FleetTwin
@@ -136,8 +136,9 @@ def run(scenario_id: str, approve: bool = False, decider=None, use_bedrock: bool
             "explanation": explanation, "events": twin.events}
 
 
-def _print(r: dict) -> None:
-    print(f"\n=== {r['scenario']}: {r['title']}  (SIMULATED fleet; real Decider + Bedrock calls)")
+def _print(r: dict, decider_source: str) -> None:
+    bedrock = f"Bedrock {r['bedrock_model']}" if r["bedrock_model"] else "no Bedrock"
+    print(f"\n=== {r['scenario']}: {r['title']}  (SIMULATED fleet; Decider: {decider_source}; {bedrock})")
     o = r["outcome"]
     print(f"initial: {o['initial_rates']}")
     for t in r["trace"]:
@@ -165,9 +166,18 @@ if __name__ == "__main__":
     ap.add_argument("--approve", action="store_true", help="operator pre-approves a profile switch if one is proposed")
     ap.add_argument("--no-bedrock", action="store_true")
     ap.add_argument("--out", help="write full JSON trace here")
+    ap.add_argument("--replay", metavar="TRACE.json",
+                    help="replay the recorded Decider answers from a saved trace instead of calling a Decider server")
     a = ap.parse_args()
-    res = run(a.scenario, approve=a.approve, use_bedrock=not a.no_bedrock)
-    _print(res)
+    if a.replay:
+        with open(a.replay) as f:
+            decider, source = ReplayDecider([t["decision"] for t in json.load(f)["trace"]]), f"replay of {a.replay}"
+    else:
+        url = os.environ.get("DECIDER_URL", "http://127.0.0.1:8099")
+        decider, source = DeciderClient(url), f"live {url}"
+    res = run(a.scenario, approve=a.approve, decider=decider, use_bedrock=not a.no_bedrock)
+    res["decider_source"] = source
+    _print(res, source)
     if a.out:
         os.makedirs(os.path.dirname(a.out) or ".", exist_ok=True)
         with open(a.out, "w") as f:

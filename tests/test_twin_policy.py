@@ -66,8 +66,8 @@ def test_germany_operator_reselection():
 
 def test_idempotent_enable():
     twin = FleetTwin("BR_PROFILE")
-    a = twin.enable_profile("profile_B", "k1")
-    assert twin.enable_profile("profile_B", "k1") is a and len(twin.events) == 1
+    a = twin.enable_profile("profile_B", "k1", approved=True)
+    assert twin.enable_profile("profile_B", "k1", approved=True) is a and len(twin.events) == 1
 
 
 def test_seed_reproducibility():
@@ -116,3 +116,10 @@ def test_profile_change_waits_for_reselection():
 
 def test_no_retry_when_registration_healthy():
     assert "retry_connection" in exclusions(FleetTwin("JP_INGEST").observe())
+
+
+def test_eim_refuses_unapproved_enable():
+    twin = FleetTwin("BR_PROFILE")
+    res = twin.enable_profile("profile_B", "k1", approved=False)
+    assert not res["ok"] and twin.s["active_profile"] == "profile_A"
+    assert twin.enable_profile("profile_B", "k1", approved=True)["ok"]  # refusal was not cached

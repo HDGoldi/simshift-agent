@@ -73,7 +73,7 @@ def guarded_profile_transition(twin: FleetTwin, target: str, approved: bool) -> 
     if not gate["allowed"]:
         return {"executed": False, "gate": gate}
     previous, previous_operator = twin.s["active_profile"], twin.s["serving_operator"]
-    result = twin.enable_profile(target, gate["idempotency_key"])
+    result = twin.enable_profile(target, gate["idempotency_key"], approved=approved)
     verified = result.get("ok", False) and twin.service_restored()
     out = {"executed": result.get("ok", False), "gate": gate, "eim": result, "verified_restored": verified}
     if result.get("ok") and not verified:

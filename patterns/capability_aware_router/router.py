@@ -42,6 +42,24 @@ class DeciderClient:
                 "client_latency_ms": round((time.perf_counter() - t0) * 1000, 1)}
 
 
+class ReplayDecider:
+    """Replays recorded Decider answers in order (from Decision.raw in a saved trace). Refuses if the live
+    question differs from the recorded one, so a stale answer is never applied to a different state."""
+
+    def __init__(self, decisions: list[dict]):
+        self.pending = [d for d in decisions if d and d.get("raw")]  # recorded errors are replayed too
+
+    def choose(self, state: Any, instructions: str, options: dict[str, str], name: str = "next_tool") -> dict:
+        if not self.pending:
+            raise ValueError("replay exhausted: no recorded answer left")
+        d = self.pending.pop(0)
+        if (json.loads(json.dumps(state)), instructions, options) != (d["state"], d["question"], d["eligible"]):
+            raise ValueError("replay mismatch: live question differs from the recorded one")
+        if "error" in d["raw"]:
+            raise OSError(f"replayed recorded Decider failure: {d['raw']['error']}")
+        return {**d["raw"], "replayed": True}
+
+
 @dataclass
 class Decision:
     question: str
@@ -74,11 +92,16 @@ class CapabilityAwareRouter:
                             "fallback", "only the fallback is admissible", self.tools[self.fallback])
         try:
             raw = self.decider.choose(decider_state if decider_state is not None else state, self.instructions, eligible)
-        except (OSError, ValueError, KeyError) as e:  # fail closed: Decider down, timeout, bad response
+            if not (isinstance(raw.get("choice"), str) and isinstance(raw.get("probabilities"), dict)
+                    and isinstance(raw.get("confidence"), (int, float))):
+                raise ValueError(f"malformed Decider answer: {raw!r}")
+        except (OSError, ValueError, KeyError, TypeError) as e:  # fail closed: Decider down, timeout, bad response
             return Decision(self.instructions, decider_state or state, eligible, excluded, {"error": repr(e)},
                             self.fallback, "fallback", "decider unavailable", self.tools[self.fallback])
-        if raw["choice"] not in eligible:  # defensive: never route outside the admissible set
-            raise ValueError(f"Decider returned non-admissible option {raw['choice']!r}")
+        if raw["choice"] not in eligible:  # fail closed: never route outside the admissible set
+            return Decision(self.instructions, decider_state if decider_state is not None else state, eligible,
+                            excluded, raw, self.fallback, "fallback",
+                            f"Decider returned non-admissible option {raw['choice']!r}", self.tools[self.fallback])
         if raw["confidence"] >= self.act_threshold:
             sel, route, why = raw["choice"], "act", f"confidence {raw['confidence']:.2f} >= {self.act_threshold}"
         else:

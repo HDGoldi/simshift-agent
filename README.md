@@ -23,6 +23,7 @@ file, [`router.py`](patterns/capability_aware_router/router.py).
 ```
 state ─► policy removes inadmissible options (with reasons) ─► Decider `choice` over the rest
       ─► confidence ≥ 0.5: act │ else: most probable read-only tool │ else: fallback
+         (an answer outside the offered options, or no answer at all, also goes to the fallback)
       ─► agent.tool.<selected>()  ─► same policy re-checked by a Strands InterventionHandler
 ```
 
@@ -80,23 +81,31 @@ AWS_PROFILE=<your-profile> .venv/bin/python -m simshift.agent BR_PROFILE --appro
 .venv/bin/python -m simshift.agent OFFLINE --no-bedrock
 ```
 
+No GPU and no AWS account? Replay a recorded run. The agent re-runs the real routing, policy and twin code against
+the Decider answers stored in a published trace, and stops if any question differs from the one recorded:
+
+```bash
+.venv/bin/python -m simshift.agent BR_PROFILE --approve --no-bedrock --replay docs/sample-runs/BR_PROFILE.json
+```
+
 Settings: `DECIDER_URL` (default `http://127.0.0.1:8099`), `SIMSHIFT_BEDROCK_MODEL` (default
 `eu.anthropic.claude-haiku-5-5`), `AWS_REGION` (default `eu-central-1`). `--approve` is the human operator's
 pre-approval for a profile switch. Without it, the gate stops at `human_approval`.
 
 ## Tests
 
-`.venv/bin/pytest -q` runs 27 tests. They need no AWS credentials, and the real-Decider test skips when no server
+`.venv/bin/pytest -q` runs 37 tests. They need no AWS credentials, and the real-Decider test skips when no server
 is running. The acceptance properties covered:
 - Decider's choice controls which Strands tool runs.
 - Excluded options are never offered and are denied on any call path.
 - Unreachable devices never get an OTA change.
-- A profile change needs approval.
+- A profile change needs approval, and the virtual eIM refuses an unapproved enable even when called directly.
 - Brazil restores both registration and telemetry.
 - No hidden truth reaches Decider or Bedrock prompts.
 - The twin is deterministic: replaying the same actions gives identical state and events.
 - The step limit escalates.
-- A Decider outage fails closed.
+- A Decider outage, a malformed answer, or an answer outside the offered options fails closed.
+- Each published trace in `docs/sample-runs/` replays through the current code to the same tools and outcome.
 
 ## Repository layout
 

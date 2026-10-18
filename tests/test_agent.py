@@ -101,3 +101,34 @@ def test_no_truth_leakage_in_bedrock_prompts(monkeypatch):
         for secret in (sc["hidden"]["cause"], sid, "best_actions", '"networks"', "ingestion_healthy",
                        "device_powered", '"hidden"'):
             assert secret not in sent, (sid, secret)
+
+
+class OffMenuDecider:
+    """Always answers evaluate_profile_change, whether or not it was offered."""
+
+    def choose(self, state, instructions, options, name="next_tool"):
+        return {"choice": "evaluate_profile_change", "probabilities": {o: 0.0 for o in options}, "confidence": 1.0}
+
+
+def test_off_menu_choice_never_reaches_the_eim():
+    r = run("OFFLINE", approve=True, decider=OffMenuDecider(), use_bedrock=False)
+    d = r["trace"][0]["decision"]
+    assert "evaluate_profile_change" in d["excluded"] and (d["selected"], d["route"]) == ("escalate_or_wait", "fallback")
+    assert not any(e["kind"].startswith("eim_") for e in r["events"])
+
+
+SAMPLE_RUNS = os.path.join(os.path.dirname(__file__), "..", "docs", "sample-runs")
+
+
+@pytest.mark.parametrize("name", sorted(os.listdir(SAMPLE_RUNS)))
+def test_published_runs_replay_identically(name):
+    from patterns.capability_aware_router.router import ReplayDecider
+    rec = json.load(open(os.path.join(SAMPLE_RUNS, name)))
+    replay = ReplayDecider([t["decision"] for t in rec["trace"]])
+    r = run(rec["scenario"], approve=rec["approved"], use_bedrock=False, decider=replay)
+    reasons = [t["decision"] and t["decision"]["reason"] for t in r["trace"]]
+    assert reasons == [t["decision"] and t["decision"]["reason"] for t in rec["trace"]] and not replay.pending
+    assert [t["tool"] for t in r["trace"]] == [t["tool"] for t in rec["trace"]]
+    assert [t["decision"] and t["decision"]["route"] for t in r["trace"]] == \
+           [t["decision"] and t["decision"]["route"] for t in rec["trace"]]
+    assert r["outcome"] == rec["outcome"]
