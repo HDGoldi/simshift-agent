@@ -127,7 +127,7 @@ profile, whose approval does not match the proposal, for an eUICC that cannot en
 forbids switching, and one it cannot deliver because the management path is down. A command that reuses an approval
 returns the first result for that approval, whatever its target. It does not repeat the gate's evidence checks (reject
 cause, reselection, coverage). A test replaces the gate with one that always passes and checks that the eIM still
-refuses an unapproved switch.
+refuses an unapproved switch. A target that is not a string raises `TypeError` before any state change.
 
 **A profile change that does not restore service is handed off.** If the gate blocks it for any reason other than a
 pending approval, the eIM cannot deliver it, verification fails and it is rolled back, rollback itself fails, or the

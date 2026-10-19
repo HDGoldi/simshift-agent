@@ -23,6 +23,7 @@ README "Live" section) and, for Bedrock, `AWS_PROFILE=<your-profile>`.
 
 ## Gotchas
 
-- `--no-bedrock` runs, replay and validate ignore `AWS_PROFILE`. `make test` still needs it unset or valid: the pattern
-  tests and the Bedrock-mocked agent tests construct a `BedrockModel`.
+- `--no-bedrock` runs (including `make replay`) and the validator ignore `AWS_PROFILE`; `--replay` without `--no-bedrock`
+  still builds a `BedrockModel`. `make test` needs `AWS_PROFILE` unset or valid: the pattern tests and the
+  Bedrock-mocked agent tests construct a `BedrockModel`.
 - Benchmark runs take ~20-40 min with both Bedrock choosers; run them in the background.
