@@ -1,5 +1,7 @@
-import pytest
+import copy
 import json
+
+import pytest
 
 from simshift.policy import (counterfactual, exclusions, guarded_profile_transition, profile_transition_gate,
                              proposal_id)
@@ -66,11 +68,58 @@ def test_germany_operator_reselection():
     assert ev["restored"] and twin.s["active_profile"] == "profile_A"
 
 
+def _twin_snapshot(twin):
+    return {
+        "state": copy.deepcopy(twin.s),
+        "diagnostics": copy.deepcopy(twin.diagnostics),
+        "rates": twin.rates(),
+        "profile_changes": twin.profile_changes,
+        "commands": copy.deepcopy(twin.commands),
+        "event_count": len(twin.events),
+        "simulated_minutes": twin.simulated_minutes(),
+    }
+
+
 def test_idempotent_enable():
     twin = FleetTwin("BR_PROFILE")
     pid = twin.proposal_id("profile_B")
-    a = twin.enable_profile("profile_B", pid)
-    assert twin.enable_profile("profile_B", pid) is a and len(twin.events) == 1
+    first = twin.enable_profile("profile_B", pid)
+    before_retry = _twin_snapshot(twin)
+    repeated = twin.enable_profile("profile_B", pid)
+    assert repeated is first
+    assert twin.s["active_profile"] == "profile_B"
+    assert _twin_snapshot(twin) == before_retry
+
+
+@pytest.mark.parametrize(("target", "reason"), [
+    ("profile_C", "target profile is not installed; command not sent"),
+    ("profile_A", "target profile is already active; command not sent"),
+])
+def test_eim_refuses_invalid_profile_targets_atomically(target, reason):
+    twin = FleetTwin("BR_PROFILE")
+    approval = twin.proposal_id(target)
+    before = _twin_snapshot(twin)
+
+    result = twin.enable_profile(target, approval)
+
+    after = _twin_snapshot(twin)
+    assert result is twin.events[-1]
+    assert result == {"seq": 1, "kind": "eim_enable_profile", "ok": False, "reason": reason}
+    for field in ("state", "diagnostics", "rates", "profile_changes", "commands"):
+        assert after[field] == before[field]
+    assert after["event_count"] == before["event_count"] + 1
+    assert after["simulated_minutes"] == before["simulated_minutes"] + 30
+
+
+def test_eim_rejects_non_string_target_without_mutation():
+    twin = FleetTwin("BR_PROFILE")
+    before = _twin_snapshot(twin)
+
+    with pytest.raises(TypeError) as error:
+        twin.enable_profile([], "uncached-approval")
+
+    assert str(error.value) == "target must be a string"
+    assert _twin_snapshot(twin) == before
 
 
 def test_seed_reproducibility():
