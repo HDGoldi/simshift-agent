@@ -150,6 +150,7 @@ class Incident:
         self.router = make_router(decider or DeciderClient(os.environ.get("DECIDER_URL", "http://127.0.0.1:8099")))
         self.llm = bedrock_model()
         self.approved: set[str] = set()  # proposal ids a human approved during the session
+        self.answers: dict[str, bool] = {}  # every human answer: proposal id -> approved?
         self.agent = Agent(model=self.llm, tools=build_tools(twin, lambda pid: approve or pid in self.approved,
                                                              self.llm if use_bedrock else None),
                            interventions=[self.router.gate(twin.observe)], callback_handler=None)
@@ -198,6 +199,7 @@ class Incident:
         pid = self.pending_approval
         if pid is None:
             raise ValueError("no proposal is waiting for approval")
+        self.answers[pid] = approve
         if not approve:
             return self._record(None, self.agent.tool.defer_or_escalate(), tool=TOOLS[FALLBACK],
                                 note=f"operator declined proposal {pid}")
@@ -226,8 +228,26 @@ class Incident:
             except Exception as e:  # the trace matters more than the prose: keep it even if Bedrock fails
                 explanation = f"Bedrock explanation unavailable: {e!r}"
         return {"scenario": self.scenario_id, "title": SCENARIOS[self.scenario_id]["title"],
-                "approved": self.pre_approved, "bedrock_model": BEDROCK_MODEL if self.use_bedrock else None,
+                "approved": self.pre_approved, "human_answers": dict(self.answers),
+                "bedrock_model": BEDROCK_MODEL if self.use_bedrock else None,
                 "trace": self.trace, "outcome": outcome, "explanation": explanation, "events": self.twin.events}
+
+
+def finish(inc: Incident, answer: Callable[[str, dict], bool | None]) -> None:
+    """Steps until done. When a proposal waits, `answer(proposal_id, gate)` approves (True), declines (False) or
+    leaves it pending (None)."""
+    while True:
+        while not inc.done:
+            inc.step()
+        pid = inc.pending_approval
+        if pid is None or (choice := answer(pid, inc.trace[-1]["tool_result"]["gate"])) is None:
+            return
+        inc.resolve_approval(choice)
+
+
+def recorded_answers(rec: dict) -> Callable[[str, dict], bool | None]:
+    """Answers a replay with the human answers stored in the recorded trace."""
+    return lambda pid, gate: rec.get("human_answers", {}).get(pid)
 
 
 def run(scenario_id: str, approve: bool = False, decider=None, use_bedrock: bool = True) -> dict:
@@ -255,7 +275,8 @@ def _print(r: dict, decider_source: str) -> None:
         print(f"    result: {json.dumps(t['tool_result'])[:400]}")
         plan = t["tool_result"].get("bedrock_plan") if isinstance(t["tool_result"], dict) else None
         if plan:
-            print(f"    Bedrock plan: recommend_proceeding={plan['recommend_proceeding']}: {plan['rationale']}")
+            print(f"    Bedrock plan: {plan['error']}" if "error" in plan else
+                  f"    Bedrock plan: recommend_proceeding={plan['recommend_proceeding']}: {plan['rationale']}")
     print(f"\noutcome: restored={o['restored']} profile={o['active_profile']} operator={o['serving_operator']} final={o['final_rates']}")
     if r["explanation"]:
         print(f"\nBedrock ({r['bedrock_model']}): {r['explanation']}")
@@ -280,27 +301,30 @@ if __name__ == "__main__":
     ap.add_argument("--replay", metavar="TRACE.json",
                     help="replay the recorded Decider answers from a saved trace instead of calling a Decider server")
     a = ap.parse_args()
+    recorded = {}
     if a.replay:
         with open(a.replay) as f:
-            decider, source = ReplayDecider([t["decision"] for t in json.load(f)["trace"]]), f"replay of {a.replay}"
+            recorded = json.load(f)
+        decider, source = ReplayDecider([t["decision"] for t in recorded["trace"]]), f"replay of {a.replay}"
     else:
         url = os.environ.get("DECIDER_URL", "http://127.0.0.1:8099")
         decider, source = DeciderClient(url), f"live {url}"
-    inc = Incident(a.scenario, approve=a.approve, decider=decider, use_bedrock=not a.no_bedrock)
-    while True:
-        while not inc.done:
-            inc.step()
-        if not (inc.pending_approval and sys.stdin.isatty()):
-            break  # no proposal waiting, or nobody at a terminal to answer it: it stays pending
-        gate = inc.trace[-1]["tool_result"]["gate"]
+    def ask(pid: str, gate: dict) -> bool | None:
+        if a.replay and pid in recorded.get("human_answers", {}):
+            return recorded["human_answers"][pid]
+        if not sys.stdin.isatty():
+            return None  # nobody at a terminal to answer: the proposal stays pending
         try:
-            answer = input(f"\nApprove proposal {inc.pending_approval}: enable {gate['target']} on "
-                           f"{inc.twin.s['devices']} devices? Every other check passed. [y/N] ")
+            reply = input(f"\nApprove proposal {pid}: enable {gate['target']} on {inc.twin.s['devices']} devices? "
+                          "Every other check passed. [y/N] ")
         except EOFError:
-            break  # no answer: the proposal stays pending
-        inc.resolve_approval(answer.strip().lower() == "y")
+            return None
+        return reply.strip().lower() == "y"
+
+    inc = Incident(a.scenario, approve=a.approve, decider=decider, use_bedrock=not a.no_bedrock)
+    finish(inc, ask)
     res = inc.result()
     res["decider_source"] = source
-    _print(res, source)
-    if a.out:
+    if a.out:  # before printing, so a presentation bug can never lose the trace
         write_trace(a.out, res)
+    _print(res, source)

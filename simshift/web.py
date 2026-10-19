@@ -142,12 +142,15 @@ def handler(app: App):
         def do_POST(self):
             if not self._local(post=True):
                 return self._json(403, {"error": "JSON requests from this page only"})
-            n = int(self.headers.get("content-length") or 0)
+            try:
+                n = int(self.headers.get("content-length") or 0)
+            except ValueError:
+                return self._json(400, {"error": "bad content-length"})
             if not 0 <= n <= 65536:
                 return self._json(413, {"error": "body too large"})
             try:
                 body = json.loads(self.rfile.read(n) or b"{}")
-            except ValueError:
+            except (ValueError, RecursionError):  # RecursionError: absurdly nested JSON
                 return self._json(400, {"error": "body must be JSON"})
             if not isinstance(body, dict):
                 return self._json(400, {"error": "body must be a JSON object"})

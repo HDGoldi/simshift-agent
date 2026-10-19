@@ -117,3 +117,20 @@ def test_advance_calls_counts_every_call():
     model = ScriptedModel([ADVANCE, ADVANCE, ("text", "REPORT")])
     r = orchestrate("OFFLINE", model=model, decider=ScriptedDecider(["investigate_data_path"]))
     assert r["advance_calls"] == len(r["trace"]) == 2
+
+
+def test_failed_rewrite_never_returns_the_stale_report():
+    class StaleThenBroken(ScriptedModel):
+        async def stream(self, messages, tool_specs=None, system_prompt=None, **kw):
+            if self.i:
+                raise RuntimeError("throttled")
+            async for e in super().stream(messages, tool_specs, system_prompt, **kw):
+                yield e
+    r = orchestrate("OFFLINE", model=StaleThenBroken([("text", "STALE")]), decider=ScriptedDecider(["investigate_data_path"]))
+    assert r["report"] is None and "throttled" in r["bedrock_error"] and r["trace"][-1]["tool"] == "defer_or_escalate"
+
+
+def test_budget_exhaustion_is_reported():
+    model = ScriptedModel([("tool", "get_incident_state", {})] * 100)
+    r = orchestrate("OFFLINE", model=model, decider=ScriptedDecider(["investigate_data_path"]))
+    assert r["report"] is None and "budget" in r["bedrock_error"]

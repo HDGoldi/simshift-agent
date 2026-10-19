@@ -132,4 +132,5 @@ One file per property in [`tests/`](tests/). No model download and no AWS.
 - `act_threshold` is a starting value. Tune it on held-out cases for your domain.
 - Use the Decider HTTP server one request at a time. Upstream docs list a concurrency race, the server has no
   authentication, and upstream labels it as meant for local experiments.
-- Option descriptions matter. Writing *when each tool suits* into the description measurably changed choices in SIMShift.
+- Option descriptions matter. Writing *when each tool suits* into the description noticeably changed choices in
+  SIMShift's dev scenarios (tuning, not a held-out measurement).

@@ -8,8 +8,8 @@
   deterministic policy has already filtered.
 - Bedrock can run the whole agent loop, but it gets two tools without parameters, so it cannot pick a recovery tool
   or approve anything.
-- On 60 generated incidents, Decider through our router ended 96.7% correctly at a median of 101 ms per choice.
-  Bedrock choosing alone ended 93.3% correctly at 2.1 s per choice. The incidents are synthetic; the caveats are below.
+- On 60 generated incidents, Decider through our router ended 96.7% correctly at a median of 94 ms per choice.
+  Bedrock choosing alone ended 91.7% correctly at 2.0 s per choice. The incidents are synthetic; the caveats are below.
 - The reusable part is `CapabilityAwareRouter`, a small pattern with no telecom code.
 
 ![Recovery Decision Inspector: Brazil cohort restored after a gated, human-approved profile switch](../screenshots/brazil-restored.png)
@@ -101,8 +101,8 @@ Neither tool takes an argument. Bedrock decides when to look, when to keep going
 NOC engineer. It has no parameter through which it could name a recovery tool, skip the policy or approve a profile
 change. The tests run the real Strands event loop with a scripted model that tries to pass
 `{"tool": "prepare_guarded_profile_transition"}` and check that Decider's choice still runs. In all six recorded
-orchestrated runs, Bedrock kept calling `advance_recovery` until the incident was terminal, and Decider's answers were
-identical to the plain-loop runs.
+orchestrated runs, Bedrock kept calling `advance_recovery` until the incident was terminal, and for the four scenarios
+that also have a plain-loop recording, Decider's answers were identical.
 
 Bedrock also does two smaller jobs: it reviews a profile-change plan before the gate (its recommendation is shown to
 the human approver, and the gate does not read it), and it explains finished runs.
@@ -112,9 +112,10 @@ the human approver, and the gate does not read it), and it explains finished run
 - **Filter before deciding.** Removed options are never shown to the model.
 - **Re-check before acting.** The policy runs again as a Strands `InterventionHandler` before any routed tool, on
   every call path, and denies anything excluded.
-- **Nine checks for a profile change.** eUICC support, failing registration, a registration reject cause, no
-  operator reselection available, an installed target, target coverage, a reachable management path, owner
-  authorization, and a human approval bound to that exact proposal.
+- **Ten checks for a profile change.** eUICC support, rollback support, failing registration, a registration
+  reject cause, no operator reselection available, an installed target, target coverage, a reachable management path,
+  owner authorization, and a human approval bound to that exact proposal. The virtual eIM then checks the approval
+  against its own proposal id, so even a broken gate could not push an unapproved switch.
 - **A recorded transition path.** Each attempt records `REQUESTED → VALIDATED → APPROVED → SENT → ACK → ENABLED →
   VERIFYING → SUCCEEDED`, or stops at `BLOCKED`, `NOT_DELIVERED` or `ROLLED_BACK`. Verification always comes before
   success. A failed verification rolls back.
@@ -149,12 +150,12 @@ diagnosis.
 
 | | rules | random | Decider | Bedrock | Bedrock + stated confidence |
 |---|---:|---:|---:|---:|---:|
-| Correct end state, with the evidence | 95.0% | 51.7% | **96.7%** | 93.3% | 90.0% |
-| First action acceptable | 95.0% | 46.7% | **86.7%** | 83.3% | 81.7% |
-| First choice = preferred tool | 95.0% | 31.7% | 50.0% | 83.3% | 78.3% |
-| Mean simulated minutes | 52.3 | 62.6 | 54.5 | 51.5 | 52.6 |
-| Chooser latency p50 / p95 | — | — | **101 / 128 ms** | 2,060 / 3,140 ms | 2,066 / 3,296 ms |
-| Bedrock tokens (in / out) | — | — | **0** | 45,739 / 24,820 | 45,044 / 26,739 |
+| Correct end state, with the evidence | 95.0% | 51.7% | **96.7%** | 91.7% | 88.3% |
+| First action acceptable | 95.0% | 46.7% | **86.7%** | 81.7% | 83.3% |
+| First choice = preferred tool | 95.0% | 31.7% | 50.0% | 81.7% | 81.7% |
+| Mean simulated minutes | 52.3 | 62.6 | 54.5 | 50.8 | 53.8 |
+| Chooser latency p50 / p95 | — | — | **94 / 119 ms** | 2,026 / 3,334 ms | 2,051 / 3,292 ms |
+| Bedrock tokens (in / out) | — | — | **0** | 47,679 / 26,994 | 50,040 / 31,930 |
 | Forbidden executions | 0 | 0 | 0 | 0 | 0 |
 
 "Bedrock" names one option, so the router always acts on it. "Bedrock + stated confidence" also gives a 0–1
@@ -165,10 +166,10 @@ What I take from it:
 - **Decider's confidence carries real signal.** All 17 first answers at confidence ≥ 0.5 picked the preferred tool.
   Below 0.5, only 13 of 43 did. Routing those uncertain answers to read-only checks is what got 58 of 60 incidents
   to the right end state. The 0.5 threshold was fixed before this run.
-- **Bedrock's stated confidence carried none.** It was between 0.60 and 0.82 on every answer, so the same threshold
-  never held an answer back. Bedrock picked the preferred first tool more often than Decider, but on transient
-  incidents it always started with modem diagnostics and then escalated instead of retrying in 4 of 10. 5 of its
-  101 answers were cut off at the output limit and went to the fallback.
+- **Bedrock's stated confidence carried none.** It was between 0.60 and 0.82 on all 92 answers that gave one, so the
+  same threshold never held an answer back. Bedrock picked the preferred first tool more often than Decider, but on
+  transient incidents it always started with modem diagnostics and then escalated instead of retrying in 4 of 10.
+  6 of its 100 answers were unusable (at least 5 cut off at the output limit) and went to the fallback.
 - **Speed and cost.** About 20 times lower latency per choice, and no Bedrock tokens for routine choices. Decider ran
   on a laptop GPU (MLX on an Apple M4 Max) and Bedrock in eu-central-1, so this is the latency an agent built this way
   sees, not a like-for-like model comparison.
@@ -180,7 +181,8 @@ What I take from it:
 
 **Caveats.** The incidents are synthetic and the families were designed with signals that point to their causes. I
 wrote the option descriptions. Each chooser ran once. Treat the table as evidence that the parts work together, not
-as a field result. Every step's raw answer is committed next to the table, and a test recomputes the table from it.
+as a field result. Every step's raw answer, tool result and twin event is committed next to the table, and a test re-derives the
+table from those records.
 
 ## 7. Where Decider struggled
 

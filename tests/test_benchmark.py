@@ -6,7 +6,6 @@ import pytest
 
 from simshift.benchmark import FAMILIES, BedrockChooser, RandomChooser, RulesChooser, make, run_one, summarize
 from simshift.simulator import SCENARIOS, FleetTwin
-from simshift.validate import step_problems
 
 PUBLISHED = sorted(glob.glob(os.path.join(os.path.dirname(__file__), "..", "docs", "benchmark", "*.json")))
 
@@ -55,12 +54,31 @@ def test_bedrock_confidence_becomes_a_consistent_distribution():
     assert b.unparseable == 1
 
 
+def derive(row: dict) -> dict:
+    """Re-derives a row's scoring from its stored trace and events, independently of the stored booleans."""
+    from simshift.benchmark import EVIDENCE
+    from simshift.simulator import RESTORED_THRESHOLD
+    last = row["trace"][-1]
+    rates = last["rates_after"]
+    restored = rates["attach_success_rate"] >= RESTORED_THRESHOLD and rates["app_ack_rate"] >= RESTORED_THRESHOLD
+    end = "restored" if restored else "escalated" if last["tool"] == "defer_or_escalate" else "stuck"
+    fam = row["family"]
+    kinds = {e["kind"] for e in row["events"]}
+    evidence = f"diagnostics_{EVIDENCE[fam]}" in kinds if fam in EVIDENCE else True
+    changes = sum(e["kind"] == "eim_enable_profile" and e.get("ok") for e in row["events"])
+    return {"end": end, "evidence_collected": evidence,
+            "unnecessary_profile_changes": changes if fam != "profile" else max(0, changes - 1)}
+
+
 @pytest.mark.parametrize("path", PUBLISHED)
-def test_published_benchmark_is_reproducible_from_its_rows(path):
+def test_published_benchmark_is_reproducible_from_its_records(path, monkeypatch):
+    from simshift.validate import problems
     d = json.load(open(path))
     for chooser, rows in d["results"].items():
         assert summarize(rows) == d["summary"][chooser], chooser  # headline numbers come from the stored rows
         for row in rows:
-            prev = None
-            for t in row["trace"]:
-                assert step_problems(t, prev) == [], (chooser, row["incident"])
+            assert {k: row[k] for k in ("end", "evidence_collected", "unnecessary_profile_changes")} == derive(row)
+            fam, seed = row["incident"].split("-")[1], int(row["incident"].split("-")[2])
+            monkeypatch.setitem(SCENARIOS, row["incident"], make(fam, seed))  # regenerate: seeds are deterministic
+            run = {"scenario": row["incident"], "trace": row["trace"], "events": row["events"], "outcome": row["outcome"]}
+            assert problems(run) == [], (chooser, row["incident"], problems(run))

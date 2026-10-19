@@ -104,3 +104,10 @@ def test_malformed_bodies_get_an_http_error(base):
     ok = {"content-type": "application/json"}
     for body in (b"{not json", b"[1]", json.dumps({"scenario": ["x"]}).encode()):
         assert raw_post(base, "/api/incidents", body, ok)[0] == 400, body
+
+
+def test_bad_lengths_and_deep_json_get_400(base):
+    ok = {"content-type": "application/json"}
+    assert raw_post(base, "/api/incidents", b"{}", {**ok, "content-length": "abc"})[0] == 400
+    deep = b"[" * 100000 + b"]" * 100000
+    assert raw_post(base, "/api/incidents", deep[:60000], ok)[0] == 400

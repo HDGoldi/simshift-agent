@@ -201,7 +201,7 @@ def _br_variant(monkeypatch, **changes):
 
 @pytest.mark.parametrize("changes, end", [
     ({"networks.BR-NET-2": "down"}, "ROLLED_BACK"),  # verification fails, rollback works
-    ({"networks.BR-NET-2": "down", "euicc.rollback_supported": False}, "ROLLBACK_FAILED"),
+    ({"euicc.rollback_supported": False}, "BLOCKED"),  # never switch without a way back
     ({"owner_allows_profile_switch": False}, "BLOCKED"),  # a gate check the policy filter does not mirror
 ])
 def test_failed_profile_change_escalates(monkeypatch, changes, end):
@@ -212,8 +212,21 @@ def test_failed_profile_change_escalates(monkeypatch, changes, end):
     assert change["tool_result"]["transition"][-1] == end
     assert r["trace"][-1]["tool"] == TOOLS["escalate_or_wait"] and end in r["trace"][-1]["note"]
     assert any(e["kind"] == "escalated" for e in r["events"])
-    if end == "ROLLBACK_FAILED":
-        assert r["outcome"]["active_profile"] == "profile_B" and not r["outcome"]["restored"]
+    if end == "BLOCKED" and "euicc.rollback_supported" in changes:
+        assert "rollback_supported" in change["tool_result"]["gate"]["failed"]
+
+
+def test_rollback_failure_escalates(monkeypatch):
+    from simshift.simulator import FleetTwin
+    sid = _br_variant(monkeypatch, **{"networks.BR-NET-2": "down"})
+    monkeypatch.setattr(FleetTwin, "rollback_profile",  # e.g. the depot gateway goes offline mid-change
+                        lambda self, prev, op: self._log("eim_rollback", ok=False, reason="IPA unreachable"))
+    r = run(sid, approve=True, decider=ScriptedDecider(["investigate_device", "evaluate_profile_change"]),
+            use_bedrock=False)
+    change = next(t for t in r["trace"] if t["tool"] == TOOLS["evaluate_profile_change"])
+    assert change["tool_result"]["transition"][-1] == "ROLLBACK_FAILED"
+    assert r["outcome"]["active_profile"] == "profile_B" and not r["outcome"]["restored"]
+    assert "ROLLBACK_FAILED" in r["trace"][-1]["note"] and any(e["kind"] == "escalated" for e in r["events"])
 
 
 def test_bedrock_review_failure_still_reaches_the_gate(monkeypatch):
@@ -228,3 +241,26 @@ def test_bedrock_review_failure_still_reaches_the_gate(monkeypatch):
     assert inc.pending_approval and "throttled" in inc.trace[-1]["tool_result"]["bedrock_plan"]["error"]
     inc.resolve_approval(True)
     assert inc.twin.service_restored()
+
+
+def test_human_answers_are_recorded_and_replayed():
+    from patterns.capability_aware_router.router import ReplayDecider
+    from simshift.agent import Incident, finish, recorded_answers
+    for approve in (True, False):
+        inc = Incident("BR_PROFILE", decider=ScriptedDecider(["investigate_device", "evaluate_profile_change"]),
+                       use_bedrock=False)
+        finish(inc, lambda pid, gate: approve)
+        rec = json.loads(json.dumps(inc.result()))
+        assert rec["approved"] is False and rec["human_answers"] == {inc.trace[1]["tool_result"]["gate"]["proposal_id"]: approve}
+        again = Incident("BR_PROFILE", decider=ReplayDecider([t["decision"] for t in rec["trace"]]), use_bedrock=False)
+        finish(again, recorded_answers(rec))
+        assert [t["tool"] for t in again.trace] == [t["tool"] for t in rec["trace"]]
+        assert again.twin.service_restored() == approve
+
+
+def test_cli_printer_handles_a_failed_bedrock_review(monkeypatch, capsys):
+    import simshift.agent as ag
+    monkeypatch.setattr(ag, "_bedrock", lambda llm, prompt, schema=None: (_ for _ in ()).throw(RuntimeError("down")))
+    r = ag.run("BR_PROFILE", approve=True, decider=ScriptedDecider(["investigate_device", "evaluate_profile_change"]))
+    ag._print(r, "test")
+    assert "Bedrock review unavailable" in capsys.readouterr().out

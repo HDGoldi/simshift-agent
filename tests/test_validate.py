@@ -47,3 +47,20 @@ def tamper(name, fn):
 def test_validator_catches_each_kind_of_tampering(name, fn, expected):
     found = problems(tamper(name, fn))
     assert any(expected in p for p in found), found
+
+
+def test_validator_requires_a_handoff_after_a_failed_profile_change(monkeypatch):
+    import copy as cp
+
+    from simshift.agent import run
+    from tests.test_agent import ScriptedDecider
+    sc = cp.deepcopy(SCENARIOS["BR_PROFILE"])
+    sc["owner_allows_profile_switch"] = False
+    monkeypatch.setitem(SCENARIOS, "BR_NO_OWNER", sc)
+    r = run("BR_NO_OWNER", approve=True, decider=ScriptedDecider(["investigate_device", "evaluate_profile_change"]),
+            use_bedrock=False)
+    assert problems(r) == []
+    silent = cp.deepcopy(r)
+    silent["trace"].pop()  # drop the handoff: the run now ends at BLOCKED
+    assert any("must be followed by a handoff" in p for p in problems(silent))
+    assert any("ends without" in p for p in problems(silent))

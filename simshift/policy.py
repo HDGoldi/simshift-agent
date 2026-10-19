@@ -1,7 +1,7 @@
 """Deterministic capability filter and profile-transition gate. No model output can bypass these."""
 from __future__ import annotations
 
-from .simulator import RESTORED_THRESHOLD, FleetTwin, idempotency_key
+from .simulator import RESTORED_THRESHOLD, FleetTwin
 
 MAX_RETRIES = 5
 MAX_RESETS_PER_DAY = 5  # above this the fault is on the device, not the network
@@ -51,6 +51,7 @@ def exclusions(obs: dict) -> dict[str, str]:
 # Allowed eUICC transition paths. Verification always precedes SUCCEEDED; a blocked request is never SENT.
 TRANSITION_PATHS = {
     ("REQUESTED", "BLOCKED"),
+    ("REQUESTED", "VALIDATED", "AWAITING_APPROVAL"),  # every check passed except the human approval
     ("REQUESTED", "VALIDATED", "APPROVED", "NOT_DELIVERED"),
     ("REQUESTED", "VALIDATED", "APPROVED", "SENT", "ACK", "ENABLED", "VERIFYING", "SUCCEEDED"),
     ("REQUESTED", "VALIDATED", "APPROVED", "SENT", "ACK", "ENABLED", "VERIFYING", "FAILED", "ROLLED_BACK"),
@@ -59,9 +60,7 @@ TRANSITION_PATHS = {
 
 
 def proposal_id(twin: FleetTwin, target: str) -> str:
-    """Identifies one proposed switch: cohort, from, to, and how many switches already ran. An approval is
-    bound to this id, so it cannot be reused for another target or after the switch it approved has run."""
-    return f"{idempotency_key(twin.scenario_id, twin.s['active_profile'], target)}.{twin.profile_changes}"
+    return twin.proposal_id(target)
 
 
 def profile_transition_gate(twin: FleetTwin, target: str, approval: str | None) -> dict:
@@ -71,6 +70,7 @@ def profile_transition_gate(twin: FleetTwin, target: str, approval: str | None) 
     pid = proposal_id(twin, target)
     checks = {
         "euicc_supports_profile_enable": s["euicc"]["supports_profile_enable"],
+        "rollback_supported": s["euicc"]["rollback_supported"],  # never switch without a way back
         "active_profile_failing_registration": twin.rates()["attach_success_rate"] < RESTORED_THRESHOLD,
         "registration_reject_evidence": bool(twin.diagnostics.get("device", {}).get("reject_cause")),
         "no_operator_reselection_available": not any(
@@ -90,10 +90,11 @@ def guarded_profile_transition(twin: FleetTwin, target: str, approval: str | Non
     """Gate -> virtual eIM enable -> verify registration AND app telemetry -> rollback if verification fails."""
     gate = profile_transition_gate(twin, target, approval)
     if not gate["allowed"]:
-        return _done({"executed": False, "gate": gate}, ["REQUESTED", "BLOCKED"])
+        waiting = gate["failed"] == ["human_approval"]
+        return _done({"executed": False, "gate": gate},
+                     ["REQUESTED", "VALIDATED", "AWAITING_APPROVAL"] if waiting else ["REQUESTED", "BLOCKED"])
     previous, previous_operator = twin.s["active_profile"], twin.s["serving_operator"]
-    # The eIM checks the approval itself, so a broken gate still could not push an unapproved switch.
-    result = twin.enable_profile(target, gate["proposal_id"], approved=approval == gate["proposal_id"])
+    result = twin.enable_profile(target, approval)  # the eIM checks the approval itself, so a broken gate cannot skip it
     if not result.get("ok"):
         return _done({"executed": False, "gate": gate, "eim": result}, ["REQUESTED", "VALIDATED", "APPROVED", "NOT_DELIVERED"])
     states = ["REQUESTED", "VALIDATED", "APPROVED", "SENT", "ACK", "ENABLED", "VERIFYING"]

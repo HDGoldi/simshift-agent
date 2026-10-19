@@ -47,6 +47,8 @@ incident is finished deterministically and Bedrock is asked to rewrite its repor
 (`report_after_fallback` in the result). If a Bedrock call fails, the incident is still finished and the error is
 recorded. The two tools share a budget of 16 calls; past it they stop the agent loop. All six orchestrated runs in
 [`docs/sample-runs/orchestrated/`](sample-runs/orchestrated/) replay to the same tools through the plain loop.
+When the budget runs out, Bedrock's report is discarded and the result says why; a report is never returned for an
+incident state it did not see.
 
 ## Role boundaries
 
@@ -95,7 +97,7 @@ scenario IDs appear in anything sent to Decider or Bedrock (`tests/test_agent.py
 
 A profile change is refused at the gate unless **all** of the following hold. The rules marked (*) also remove it from
 Decider's options beforehand:
-- the eUICC supports profile enable;
+- the eUICC supports profile enable, and rollback, so a failed switch can be undone;
 - (*) the active profile is failing registration;
 - (*) no operator reselection is available on the active profile;
 - (*) modem diagnostics show a registration reject cause;
@@ -125,6 +127,7 @@ This is a consistency binding inside the simulation, not authentication.
 | Path | When |
 |---|---|
 | `REQUESTED → BLOCKED` | a gate check failed; nothing is sent |
+| `REQUESTED → VALIDATED → AWAITING_APPROVAL` | every check passed except the human approval; nothing is sent yet |
 | `REQUESTED → VALIDATED → APPROVED → NOT_DELIVERED` | the eIM refused or could not reach the IPA |
 | `… → SENT → ACK → ENABLED → VERIFYING → SUCCEEDED` | registration and telemetry verified |
 | `… → VERIFYING → FAILED → ROLLED_BACK` (or `ROLLBACK_FAILED`) | verification failed |

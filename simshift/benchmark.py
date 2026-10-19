@@ -141,15 +141,17 @@ class BedrockChooser(_OneHot):
                   + ('\nAnswer with JSON only: {"choice": "<one option name>", "confidence": <0 to 1, how sure you are>}'
                      if self.with_confidence else "\nAnswer with exactly one option name and nothing else."))
         t0 = time.perf_counter()
+        agent = Agent(model=self.llm, tools=[], callback_handler=None)
         try:
-            res = Agent(model=self.llm, tools=[], callback_handler=None)(prompt)
+            res = agent(prompt)
         except MaxTokensReachedException as e:
             self.unparseable += 1
             self.samples.append("(cut off at the output token limit)")
             raise ValueError("Bedrock answer hit the token limit") from e
+        finally:  # a cut-off answer still cost tokens: count every call
+            for k in self.tokens:
+                self.tokens[k] += agent.event_loop_metrics.accumulated_usage.get(k, 0)
         ms = round((time.perf_counter() - t0) * 1000, 1)
-        for k in self.tokens:
-            self.tokens[k] += res.metrics.accumulated_usage.get(k, 0)
         text = str(res).strip()
         if self.with_confidence:
             return {**self._with_confidence(text, options), "client_latency_ms": ms, "model": BEDROCK_MODEL}
@@ -213,7 +215,7 @@ def run_one(sid: str, family: str, chooser) -> dict:
             "correct_without_collateral": end == terminal and evidence and unnecessary == 0,
             "steps": o["steps"], "simulated_minutes": o["simulated_minutes"],
             "forbidden_executions": o["forbidden_executions"], "chooser_ms": calls,
-            "trace": [{"decision": t["decision"], "tool": t["tool"], "note": t.get("note")} for t in inc.trace]}
+            "trace": inc.trace, "events": inc.twin.events, "outcome": o}  # full records: every number is re-derivable
 
 
 def summarize(rows: list[dict]) -> dict:
@@ -291,7 +293,7 @@ if __name__ == "__main__":
     os.makedirs(a.out_dir, exist_ok=True)
     base = os.path.join(a.out_dir, f"benchmark-{a.stamp}")
     with open(base + ".json", "w") as f:
-        json.dump({"meta": meta, "summary": summaries, "results": results}, f, indent=1)
+        json.dump({"meta": meta, "summary": summaries, "results": results}, f, separators=(",", ":"))
     with open(base + ".md", "w") as f:
         f.write(markdown(meta, summaries))
     print(open(base + ".md").read())

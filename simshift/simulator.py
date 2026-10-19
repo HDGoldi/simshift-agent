@@ -276,12 +276,19 @@ class FleetTwin:
                 "installed": {p: {"operators": v["operators"], "enabled": p == s["active_profile"]}
                               for p, v in s["profiles"].items()}}
 
-    def enable_profile(self, target: str, idempotency_key: str, *, approved: bool) -> dict:
-        """Simulator-only. Independent of the policy gate, the virtual eIM refuses unapproved or undeliverable commands."""
-        if not approved:  # not cached: a later approved attempt with the same key must really execute
-            return self._log("eim_enable_profile", ok=False, reason="no operator approval; command not sent")
-        if idempotency_key in self.commands:
-            return self.commands[idempotency_key]
+    def proposal_id(self, target: str) -> str:
+        """Identifies one proposed switch: cohort, from, to, and how many switches already ran. An approval is
+        bound to this id, so it cannot be reused for another target or after the switch it approved has run."""
+        return f"{idempotency_key(self.scenario_id, self.s['active_profile'], target)}.{self.profile_changes}"
+
+    def enable_profile(self, target: str, approval: str | None) -> dict:
+        """Simulator-only. Independent of the policy gate, the virtual eIM compares the approval with its own id for
+        this proposal and refuses a mismatch, and refuses a command it cannot deliver. The approval doubles as the
+        idempotency key, so a repeated command returns the first result."""
+        if approval in self.commands:
+            return self.commands[approval]
+        if approval != self.proposal_id(target):  # not cached: a later approved attempt must really execute
+            return self._log("eim_enable_profile", ok=False, reason="no operator approval for this proposal; command not sent")
         s = self.s
         if not self.management_reachable():
             res = self._log("eim_enable_profile", ok=False, reason="IPA unreachable; command not delivered")
@@ -295,7 +302,7 @@ class FleetTwin:
             res = self._log("eim_enable_profile", ok=True, from_profile=prev, to_profile=target,
                             ipa_ack=True, serving_operator=s["serving_operator"],
                             restored=self.service_restored(), rates=self.rates())
-        self.commands[idempotency_key] = res
+        self.commands[approval] = res
         return res
 
     def escalate(self) -> dict:

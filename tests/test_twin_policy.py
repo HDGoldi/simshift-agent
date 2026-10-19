@@ -66,8 +66,9 @@ def test_germany_operator_reselection():
 
 def test_idempotent_enable():
     twin = FleetTwin("BR_PROFILE")
-    a = twin.enable_profile("profile_B", "k1", approved=True)
-    assert twin.enable_profile("profile_B", "k1", approved=True) is a and len(twin.events) == 1
+    pid = twin.proposal_id("profile_B")
+    a = twin.enable_profile("profile_B", pid)
+    assert twin.enable_profile("profile_B", pid) is a and len(twin.events) == 1
 
 
 def test_seed_reproducibility():
@@ -120,9 +121,10 @@ def test_no_retry_when_registration_healthy():
 
 def test_eim_refuses_unapproved_enable():
     twin = FleetTwin("BR_PROFILE")
-    res = twin.enable_profile("profile_B", "k1", approved=False)
-    assert not res["ok"] and twin.s["active_profile"] == "profile_A"
-    assert twin.enable_profile("profile_B", "k1", approved=True)["ok"]  # refusal was not cached
+    for wrong in (None, "k1", twin.proposal_id("profile_C")):
+        res = twin.enable_profile("profile_B", wrong)
+        assert not res["ok"] and twin.s["active_profile"] == "profile_A"
+    assert twin.enable_profile("profile_B", twin.proposal_id("profile_B"))["ok"]  # refusals were not cached
 
 
 def test_approval_is_bound_to_one_proposal():
@@ -184,7 +186,7 @@ def test_transient_clears_on_retry_only():
 def test_rollback_needs_the_same_management_path_as_enable():
     twin = FleetTwin("TRANSIENT")  # management rides on cellular
     twin.s["networks"]["FR-NET-2"] = "down"
-    assert twin.enable_profile("profile_B", "k", approved=True)["ok"]  # direct eIM call while still registered
+    assert twin.enable_profile("profile_B", twin.proposal_id("profile_B"))["ok"]  # direct eIM call, still registered
     assert not twin.management_reachable()  # profile_B cannot register, so the cellular path is gone
     assert not twin.rollback_profile("profile_A", "FR-NET-1")["ok"]
 

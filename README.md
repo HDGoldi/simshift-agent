@@ -56,8 +56,8 @@ Before Decider sees the options, the policy removes inadmissible ones. A profile
 - while the active profile registers normally;
 - before modem diagnostics show a registration reject cause.
 
-The same rules run again at the gate, together with owner authorization and a human approval that is bound to that
-exact proposal. Every attempt records its eUICC transition path (`REQUESTED → … → VERIFYING → SUCCEEDED`, or
+The same rules run again at the gate, together with eUICC rollback support, owner authorization and a human approval
+that is bound to that exact proposal. Every attempt records its eUICC transition path (`REQUESTED → … → VERIFYING → SUCCEEDED`, or
 `BLOCKED`, `ROLLED_BACK`, …). Details: [docs/architecture.md](docs/architecture.md).
 
 ## Bedrock runs the loop; Decider still picks every tool
@@ -87,19 +87,19 @@ Per-step numbers, latencies and the known Decider misses: [docs/measurements.md]
 ## Benchmark: Decider vs Bedrock-only vs rules vs random
 
 60 generated incidents across the six families, every chooser running through the same router, policy and gate
-([full table and raw answers](docs/benchmark/benchmark-2026-10-18.md)). An escalation only counts as correct if the
+([full table and raw records](docs/benchmark/benchmark-2026-10-19.md)). An escalation only counts as correct if the
 diagnostic that finds the cause ran first.
 
 | | rules | random | **Decider** | Bedrock | Bedrock + stated confidence |
 |---|---:|---:|---:|---:|---:|
-| Correct end state, with the evidence | 95.0% | 51.7% | **96.7%** | 93.3% | 90.0% |
-| First action acceptable | 95.0% | 46.7% | **86.7%** | 83.3% | 81.7% |
-| Chooser latency p50 | — | — | **101 ms** | 2,060 ms | 2,066 ms |
-| Bedrock tokens | 0 | 0 | **0** | 70,559 | 71,783 |
+| Correct end state, with the evidence | 95.0% | 51.7% | **96.7%** | 91.7% | 88.3% |
+| First action acceptable | 95.0% | 46.7% | **86.7%** | 81.7% | 83.3% |
+| Chooser latency p50 | — | — | **94 ms** | 2,026 ms | 2,051 ms |
+| Bedrock tokens | 0 | 0 | **0** | 74,673 | 81,970 |
 | Forbidden executions (audited) | 0 | 0 | 0 | 0 | 0 |
 
 Decider's raw first pick was the preferred tool only half the time; the confidence routing turned its uncertain picks
-into read-only evidence gathering. Bedrock picked better first tools (83.3%), but its stated confidence never dropped
+into read-only evidence gathering. Bedrock picked better first tools (81.7%), but its stated confidence never dropped
 below 0.60, so the same routing never held it back. **These are synthetic incidents from families we designed**,
 Decider ran on a laptop GPU and Bedrock in eu-central-1, and each chooser ran once. Read the caveats in
 [docs/measurements.md](docs/measurements.md#benchmark) before quoting any of it.
@@ -154,7 +154,8 @@ Bedrock is never called in tests. The acceptance properties covered:
 - Excluded options are never offered and are denied on any call path; an independent audit counts violations.
 - Unreachable devices never get an OTA change, not even a forced one on a clone.
 - A profile change needs an approval bound to that exact proposal; the virtual eIM checks it again on its own.
-- A blocked, failed or rolled-back profile change, or a failed Bedrock review, ends in a handoff, never a silent stop.
+- A blocked, failed or rolled-back profile change ends in a handoff, never a silent stop; a failed Bedrock review is
+  recorded and the proposal still goes to the gate.
 - The UI refuses requests from other web pages and rebound host names.
 - Brazil restores both registration and telemetry; a failed verification rolls back.
 - No hidden truth reaches Decider, Bedrock or the UI.

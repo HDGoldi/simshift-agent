@@ -12,10 +12,11 @@ Model `StrandsAgents/strands-decider-2B-qwen3.5-v1-2610`, repo `strands-labs/str
 |---|---|---|---|
 | MLX (in-process) | Apple M4 Max laptop | median 401 ms (5 calls, 4 options) | 4.8 GB |
 | MLX (HTTP server), first agent runs | same | 367–517 ms per decision | — |
-| MLX (HTTP server), later runs | same | median 122 ms (101–145, 12 decisions in the orchestrated runs); p50 101 ms, p95 128 ms (135 decisions in the benchmark) | — |
+| MLX (HTTP server), later runs | same | median 122 ms (101–145, 12 decisions in the orchestrated runs); p50 92 ms, p95 118 ms (135 decisions in the benchmark) | — |
 | torch CPU (in-process) | same laptop, CPU only | about 1.0 s | 12.1 GB (fp32) |
 
-The server's `latency_ms` field is what is reported. The later runs were faster on the same long-running server; it
+The server's `latency_ms` field is what is reported here; the benchmark table further down reports client-side wall
+clock per choice (p50 94 ms, p95 119 ms for the same 135 decisions), so that Decider and Bedrock are timed the same way. The later runs were faster on the same long-running server; it
 reports `prefix_cache: true`, and the incidents share most of their prompt, which is the likely reason. We did not
 isolate the cause. The first-ever load took about 450 s, almost all of it downloading the ~4.3 GB base model; a
 cached load takes about 2 s. Upstream publishes about 115 ms on an RTX 3090 for an older checkpoint. We have **not**
@@ -63,8 +64,9 @@ plan-review call inside the profile-change tool, which is not included in that c
 
 ## Benchmark
 
-Full table: [`docs/benchmark/benchmark-2026-10-18.md`](benchmark/benchmark-2026-10-18.md); every step's raw answer
-is in the matching `.json`, and a test recomputes every summary number from those rows and re-validates every step.
+Full table: [`docs/benchmark/benchmark-2026-10-19.md`](benchmark/benchmark-2026-10-19.md), run on 2026-10-19. The
+matching `.json` keeps every step's raw answer, tool result and twin event. A test re-derives each row's score from
+those records, recomputes every summary number, and runs the full trace validator on all 300 runs.
 Run it with `python -m simshift.benchmark --stamp <label>`.
 
 60 generated incidents, 10 in each of 6 families (operator, profile, application, unreachable, firmware, transient),
@@ -74,15 +76,15 @@ end for application and firmware incidents only if the diagnostic that finds the
 
 | Metric | rules | random | **decider** | bedrock | bedrock+conf |
 |---|---:|---:|---:|---:|---:|
-| Correct end state, with the evidence | 95.0% | 51.7% | **96.7%** | 93.3% | 90.0% |
-| First action acceptable | 95.0% | 46.7% | **86.7%** | 83.3% | 81.7% |
-| First choice = preferred tool | 95.0% | 31.7% | 50.0% | 83.3% | 78.3% |
+| Correct end state, with the evidence | 95.0% | 51.7% | **96.7%** | 91.7% | 88.3% |
+| First action acceptable | 95.0% | 46.7% | **86.7%** | 81.7% | 83.3% |
+| First choice = preferred tool | 95.0% | 31.7% | 50.0% | 81.7% | 81.7% |
 | Unnecessary profile changes | 0 | 0 | 0 | 0 | 0 |
 | Forbidden executions (audited) | 0 | 0 | 0 | 0 | 0 |
-| Mean steps | 1.93 | 2.05 | 2.58 | 1.75 | 1.70 |
-| Mean simulated minutes | 52.3 | 62.6 | 54.5 | 51.5 | 52.6 |
-| Chooser latency p50 / p95 | — | — | **101 / 128 ms** | 2,060 / 3,140 ms | 2,066 / 3,296 ms |
-| Bedrock tokens (in / out) | 0 | 0 | **0** | 45,739 / 24,820 | 45,044 / 26,739 |
+| Mean steps | 1.93 | 2.05 | 2.58 | 1.70 | 1.72 |
+| Mean simulated minutes | 52.3 | 62.6 | 54.5 | 50.8 | 53.8 |
+| Chooser latency p50 / p95 | — | — | **94 / 119 ms** | 2,026 / 3,334 ms | 2,051 / 3,292 ms |
+| Bedrock tokens (in / out) | 0 | 0 | **0** | 47,679 / 26,994 | 50,040 / 31,930 |
 
 `bedrock` asks Haiku 5.5 to name one option; with no probabilities, the router always acts on it. `bedrock+conf`
 asks for an option and a 0–1 confidence, turns that into the distribution with the same derived confidence, and
@@ -93,13 +95,13 @@ How to read it:
   confidence routing did that. The 17 first answers at confidence ≥ 0.5 all picked the preferred tool. Of the 43
   below 0.5, 13 did; the router ran the most probable read-only check instead, and 35 of those 43 first actions were
   acceptable. The 0.5 threshold was set before this run and not tuned on it.
-- **Bedrock's stated confidence did not help.** Every one of its stated confidences was between 0.60 and 0.82, so the
-  0.5 threshold never held an answer back, and `bedrock+conf` behaved like `bedrock` with more unusable answers.
-- **Bedrock picked the preferred first tool more often** (83.3%) but did worse on transient incidents: it always
-  started with modem diagnostics and then escalated instead of retrying in 4 of 10. 5 of its 101 answers were cut off at the
-  512-token output limit, and 10 of 100 `bedrock+conf` answers were unusable (cut off, or no valid option and
-  confidence); each went to the fallback.
-- **Decider was about 20 times faster per choice** (p50 101 ms on a laptop GPU vs 2.1 s for a Bedrock call) and used
+- **Bedrock's stated confidence did not help.** All 92 stated confidences were between 0.60 and 0.82, so the 0.5
+  threshold never held an answer back, and `bedrock+conf` did slightly worse than `bedrock`.
+- **Bedrock picked the preferred first tool more often** (81.7%) but did worse on transient incidents: it always
+  started with modem diagnostics and then escalated instead of retrying in 4 of 10. It also escalated one application
+  incident before the data-path check. 6 of its 100 answers (8 for `bedrock+conf`) were unusable, at least 5 of them
+  cut off at the 512-token output limit; each went to the fallback. Token counts include the cut-off calls.
+- **Decider was about 20 times faster per choice** (p50 94 ms on a laptop GPU vs 2.0 s for a Bedrock call) and used
   no Bedrock tokens. These run on different hardware, so this is not a like-for-like model comparison; it is what an
   agent built this way experiences.
 - **The guardrails, not the chooser, kept every strategy safe.** No chooser made a forbidden execution or an

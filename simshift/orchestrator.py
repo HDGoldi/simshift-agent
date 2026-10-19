@@ -84,16 +84,21 @@ def orchestrate(scenario_id: str, approve: bool = False, decider=None, model=Non
     report, error, rewritten = None, None, False
     try:
         report = str(agent(f"New incident: {inc.twin.s['incident']}. Follow your procedure.")).strip()
+        if tools[0].calls["total"] > MAX_TOOL_CALLS:
+            report, error = None, f"tool budget of {MAX_TOOL_CALLS} calls exhausted; Bedrock's report was discarded"
         if not inc.done:  # Bedrock stopped early: finish deterministically, then have it report on the final trace
             first = len(inc.trace)
             while not inc.done:
                 inc.step()
-            rest = [_summary(t, inc) for t in inc.trace[first:]]
-            report = str(agent("You stopped before the incident was finished. These steps then ran deterministically:\n"
-                               + json.dumps(rest) + "\nRewrite the full report for the final state.")).strip()
-            rewritten = True
+            if error is None:
+                rest = [_summary(t, inc) for t in inc.trace[first:]]
+                report = None  # the first report describes an unfinished incident; never return it as final
+                report = str(agent("You stopped before the incident was finished. These steps then ran "
+                                   "deterministically:\n" + json.dumps(rest) +
+                                   "\nRewrite the full report for the final state.")).strip() or None
+                rewritten = report is not None
     except Exception as e:  # Bedrock failed mid-run: the incident still ends safely and the trace is kept
-        error = f"{type(e).__name__}: {e}"
+        report, error = None, f"{type(e).__name__}: {e}"
         while not inc.done:
             inc.step()
     usage = agent.event_loop_metrics.accumulated_usage
@@ -109,15 +114,17 @@ if __name__ == "__main__":
     from .agent import SCENARIOS
     ap = argparse.ArgumentParser()
     ap.add_argument("scenario", choices=list(SCENARIOS))
-    ap.add_argument("--approve", action="store_true", help="operator pre-approves a profile switch if one is proposed")
+    ap.add_argument("--approve", action="store_true",
+                    help="scripted pre-approval of every proposal this run makes. Without it a proposed switch stays "
+                         "pending; to approve one interactively use python -m simshift.agent or the UI.")
     ap.add_argument("--out", help="write full JSON trace here")
     a = ap.parse_args()
     url = os.environ.get("DECIDER_URL", "http://127.0.0.1:8099")
     res = orchestrate(a.scenario, a.approve, DeciderClient(url))
     res["decider_source"] = f"live {url}"
+    if a.out:  # before printing, so a presentation bug can never lose the trace
+        write_trace(a.out, res)
     _print(res, res["decider_source"])
     print(f"\nBedrock report ({res['bedrock_model']}, {res['advance_calls']} advance_recovery calls, "
           f"{res['bedrock_usage']}{', rewritten after a deterministic finish' if res['report_after_fallback'] else ''}):"
           f"\n{res['report'] or res['bedrock_error']}")
-    if a.out:
-        write_trace(a.out, res)

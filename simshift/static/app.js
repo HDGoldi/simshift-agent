@@ -128,7 +128,8 @@ function render(s) {
   if (s.pending_approval) {
     const p = s.bedrock_plan;
     $("approval-plan").innerHTML = `Proposal <code>${esc(s.pending_approval)}</code>: enable <b>${esc(s.gate.target)}</b>.` +
-      (p ? `<br>Bedrock review: <b>${p.recommend_proceeding ? "proceed" : "do not proceed"}</b>. ${esc(p.rationale)}` : "");
+      (p && p.error ? `<br>${esc(p.error)} (advisory only; the checks above still apply).`
+        : p ? `<br>Bedrock review: <b>${p.recommend_proceeding ? "proceed" : "do not proceed"}</b>. ${esc(p.rationale)}` : "");
   }
 
   const d = $("done");
@@ -205,9 +206,9 @@ function renderEuicc(s) {
     `<li><span class="${ok ? "y" : "n"}" aria-hidden="true">${ok ? "✓" : "✗"}</span> ${esc(k.replaceAll("_", " "))}
      <span class="sr-only">${ok ? "passes" : "fails"}</span></li>`).join("") +
     `<li class="muted small">Target ${esc(s.gate.target)} · ${s.transition ? "last attempt" : "live preview, no approval yet"}</li>`;
-  const path = s.pending_approval ? ["REQUESTED", "VALIDATED", "AWAITING HUMAN APPROVAL"] : s.transition;
+  const path = s.transition;
   $("timeline").innerHTML = path
-    ? path.map((x) => `<li style="color:var(--${["BLOCKED", "FAILED", "NOT_DELIVERED", "ROLLBACK_FAILED"].includes(x) ? "bad" : x === "SUCCEEDED" ? "ok" : "text"})">${esc(x)}</li>`).join("")
+    ? path.map((x) => `<li style="color:var(--${["BLOCKED", "FAILED", "NOT_DELIVERED", "ROLLBACK_FAILED"].includes(x) ? "bad" : x === "SUCCEEDED" ? "ok" : x === "AWAITING_APPROVAL" ? "warn" : "text"})">${esc(x)}</li>`).join("")
     : `<li class="muted">No profile transition yet.</li>`;
 }
 

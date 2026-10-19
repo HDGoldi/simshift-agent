@@ -1,6 +1,6 @@
 """Spike used on 2026-10-18 to validate the Strands Decider API before building the agent.
 
-Runs the in-process engine (not the HTTP server) on the illustrative Brazil state from the original design notes,
+Runs the in-process engine (not the HTTP server) on an illustrative Brazil state,
 and prints the raw choice/noul answers and latencies. Run it with the strands-decider venv:
     python spikes/decider_spike.py mlx|cpu
 """
