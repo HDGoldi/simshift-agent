@@ -8,8 +8,8 @@
   deterministic policy has already filtered.
 - Bedrock can run the whole agent loop, but it gets two tools without parameters, so it cannot pick a recovery tool
   or approve anything.
-- On 60 generated incidents, Decider through our router ended every incident correctly at a median of 100 ms per
-  choice. Bedrock alone ended 95% correctly at 1.9 s per choice. The incidents are synthetic; the caveats are below.
+- On 60 generated incidents, Decider through our router ended 96.7% correctly at a median of 101 ms per choice.
+  Bedrock choosing alone ended 93.3% correctly at 2.1 s per choice. The incidents are synthetic; the caveats are below.
 - The reusable part is `CapabilityAwareRouter`, a small pattern with no telecom code.
 
 ![Recovery Decision Inspector: Brazil cohort restored after a gated, human-approved profile switch](../screenshots/brazil-restored.png)
@@ -142,38 +142,45 @@ read-only), then escalation. In the UI you can force a profile change on a clone
 | Firmware loop | reset loop found and escalated to the device team |
 | Transient congestion | restored by one retry |
 
-**A benchmark on 60 generated incidents**, 10 per family, seeds the project never used for tuning. Four choosers
-answered the same question through the same router, policy and gate:
+**A benchmark on 60 generated incidents**, 10 per family, seeds the project never used for tuning. Five choosers
+answered the same question through the same router, policy and gate. An escalation only counts as a correct end
+for application and firmware incidents if the diagnostic that finds the cause ran first; handing off blind is not a
+diagnosis.
 
-| | rules | random | Decider | Bedrock-only |
-|---|---:|---:|---:|---:|
-| Correct end state | 95.0% | 66.7% | **100.0%** | 95.0% |
-| First action acceptable | 95.0% | 46.7% | **86.7%** | 81.7% |
-| First choice = preferred tool | 95.0% | 31.7% | 50.0% | 81.7% |
-| Mean simulated minutes | 52.3 | 62.6 | 54.5 | 50.2 |
-| Chooser latency p50 / p95 | — | — | **100 / 129 ms** | 1,908 / 3,193 ms |
-| Bedrock tokens (in / out) | — | — | **0** | 45,245 / 22,834 |
-| Forbidden executions | 0 | 0 | 0 | 0 |
+| | rules | random | Decider | Bedrock | Bedrock + stated confidence |
+|---|---:|---:|---:|---:|---:|
+| Correct end state, with the evidence | 95.0% | 51.7% | **96.7%** | 93.3% | 90.0% |
+| First action acceptable | 95.0% | 46.7% | **86.7%** | 83.3% | 81.7% |
+| First choice = preferred tool | 95.0% | 31.7% | 50.0% | 83.3% | 78.3% |
+| Mean simulated minutes | 52.3 | 62.6 | 54.5 | 51.5 | 52.6 |
+| Chooser latency p50 / p95 | — | — | **101 / 128 ms** | 2,060 / 3,140 ms | 2,066 / 3,296 ms |
+| Bedrock tokens (in / out) | — | — | **0** | 45,739 / 24,820 | 45,044 / 26,739 |
+| Forbidden executions | 0 | 0 | 0 | 0 | 0 |
+
+"Bedrock" names one option, so the router always acts on it. "Bedrock + stated confidence" also gives a 0–1
+confidence, which goes through the same 0.5 threshold and read-only fallback as Decider's.
 
 What I take from it:
 
 - **Decider's confidence carries real signal.** All 17 first answers at confidence ≥ 0.5 picked the preferred tool.
-  Below 0.5, only 13 of 43 did. Routing those uncertain answers to read-only checks is what got every incident to the
-  right end state. The 0.5 threshold was fixed before this run.
-- **Bedrock alone picked better first tools but finished worse.** It never retried first on transient incidents, so
-  3 of 10 ended escalated instead of restored. 5 of its 100 answers were unusable (no single option named, or cut
-  off at the output limit) and went to the fallback.
-- **Speed and cost.** About 19 times lower latency per choice, and no Bedrock tokens for routine choices. Decider ran
+  Below 0.5, only 13 of 43 did. Routing those uncertain answers to read-only checks is what got 58 of 60 incidents
+  to the right end state. The 0.5 threshold was fixed before this run.
+- **Bedrock's stated confidence carried none.** It was between 0.60 and 0.82 on every answer, so the same threshold
+  never held an answer back. Bedrock picked the preferred first tool more often than Decider, but on transient
+  incidents it always started with modem diagnostics and then escalated instead of retrying in 4 of 10. 5 of its
+  101 answers were cut off at the output limit and went to the fallback.
+- **Speed and cost.** About 20 times lower latency per choice, and no Bedrock tokens for routine choices. Decider ran
   on a laptop GPU (MLX on an Apple M4 Max) and Bedrock in eu-central-1, so this is the latency an agent built this way
   sees, not a like-for-like model comparison.
 - **The guardrails kept even random choices safe.** No chooser made a forbidden execution or an unnecessary profile
   change. The chooser decides whether and how fast recovery happens.
 - **Rules did well because rules can.** I wrote the runbook from domain knowledge, and these families are tidy. It
-  still missed transient incidents whose signals were noisy. Real fleets are messier than both.
+  checks the recent-firmware flag before the attach trend, so it missed the 3 transient incidents where that flag
+  was a distractor. Real fleets are messier than both.
 
 **Caveats.** The incidents are synthetic and the families were designed with signals that point to their causes. I
 wrote the option descriptions. Each chooser ran once. Treat the table as evidence that the parts work together, not
-as a field result. Every step's raw Decider answer is committed next to the table.
+as a field result. Every step's raw answer is committed next to the table, and a test recomputes the table from it.
 
 ## 7. Where Decider struggled
 
@@ -183,6 +190,10 @@ as a field result. Every step's raw Decider answer is committed next to the tabl
   deterministic rule: no profile change while the active profile registers normally.
 - **Firmware loop.** After the diagnostics reported a reset loop, Decider still preferred retrying (p 0.75,
   confidence 0.50, twice). I added a rule: no retries once a reset loop is diagnosed.
+- **Two generated firmware incidents.** Decider chose `retry_connection` at all six steps. The first, at low
+  confidence, became a read-only data-path check; the next five ran as retries, and the step limit escalated
+  without the modem diagnostics, so the reset-loop rule never fired. I left it unfixed: requiring modem diagnostics
+  before any retry would be a rule written for this result.
 - **Raw first picks.** In the benchmark, Decider's top choice was the preferred first tool only half the time.
 
 The pattern in these fixes: when the model is wrong in a way a domain expert would call a rule, write the rule.

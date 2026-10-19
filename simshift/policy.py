@@ -92,7 +92,8 @@ def guarded_profile_transition(twin: FleetTwin, target: str, approval: str | Non
     if not gate["allowed"]:
         return _done({"executed": False, "gate": gate}, ["REQUESTED", "BLOCKED"])
     previous, previous_operator = twin.s["active_profile"], twin.s["serving_operator"]
-    result = twin.enable_profile(target, gate["proposal_id"], approved=True)
+    # The eIM checks the approval itself, so a broken gate still could not push an unapproved switch.
+    result = twin.enable_profile(target, gate["proposal_id"], approved=approval == gate["proposal_id"])
     if not result.get("ok"):
         return _done({"executed": False, "gate": gate, "eim": result}, ["REQUESTED", "VALIDATED", "APPROVED", "NOT_DELIVERED"])
     states = ["REQUESTED", "VALIDATED", "APPROVED", "SENT", "ACK", "ENABLED", "VERIFYING"]

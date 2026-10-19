@@ -17,8 +17,9 @@
 
 Encouraged, not required: a measured latency/cost comparison against an LLM, decision accuracy, low-confidence
 handling. All three are in: low-confidence routing is visible in every trace, and
-[`docs/benchmark/`](benchmark/) compares rules, random, Decider and Bedrock-only choosers on 60 generated incidents,
-with accuracy, latency and Bedrock token counts ([measurements](measurements.md#benchmark)).
+[`docs/benchmark/`](benchmark/) compares rules, random, Decider and two Bedrock-only choosers (with and without a
+stated confidence) on 60 generated incidents, with accuracy, latency and Bedrock token counts
+([measurements](measurements.md#benchmark)).
 Latency on AWS hardware is not measured yet.
 
 ## Pre-submit QA

@@ -44,8 +44,8 @@
      },
      "confidence": 0.7094,
      "model": "strands-decider-2B-qwen3.5-v1-2610",
-     "latency_ms": 128.31,
-     "client_latency_ms": 156.7
+     "latency_ms": 129.68,
+     "client_latency_ms": 147.6
     },
     "selected": "investigate_data_path",
     "route": "act",
@@ -117,8 +117,8 @@
      },
      "confidence": 0.0854,
      "model": "strands-decider-2B-qwen3.5-v1-2610",
-     "latency_ms": 117.69,
-     "client_latency_ms": 119.4
+     "latency_ms": 105.8,
+     "client_latency_ms": 116.7
     },
     "selected": "investigate_device",
     "route": "gather_evidence",
@@ -290,11 +290,13 @@
   }
  ],
  "mode": "orchestrated",
- "report": "**SIMShift report (all data is simulated)**\n\n**What happened**\nTelemetry incident in JP, 11,600 devices, serving operator JP-NET-1, on profile_A. Attach was 0.997 and heartbeat 0.99, but app_ack was 0.02. The cellular link is healthy and the fault sits above it. The ingestion endpoint is returning HTTP 5xx on 0.98 of requests since deploy ingest-v2.14.\n\n**Decisions**\n- Step 1: Policy removed retry_connection, try_allowed_operator and evaluate_profile_change. Choice: investigate_data_path, confidence 0.71, route: act. Result: APN and PDN healthy, ingest 5xx rate 0.98.\n- Step 2: Policy also removed investigate_data_path. Choice: escalate_or_wait, confidence 0.09, route: gather_evidence. Result: modem healthy, firmware uniform, 0.1 resets/day.\n- Step 3: Only the fallback was admissible. Action: defer_or_escalate, which escalated the incident.\n\n**Outcome**\nRates after the last step were unchanged: attach 0.997, data session 0.99, app_ack 0.02, heartbeat 0.99. Not restored. No profile change was made, and none was needed or approved.\n\n**Next**\nEscalate to the ingestion owners: roll back or fix ingest-v2.14, which is rejecting payloads. Once it is fixed, confirm app_ack recovers. The recovery loop cannot fix this itself, and no retries were attempted.",
+ "report": "**Report: Telemetry not arriving (JP, simulated fleet; all data here is simulated)**\n\n**What happened**\n11,600 devices on JP-NET-1, profile_A. Attach (0.997), data session (0.99) and heartbeat (0.99) were healthy, but app_ack_rate was 0.02. Retries before the incident: 0.\n\n**Decisions**\n- **Step 1:** Policy removed retry_connection, try_allowed_operator and evaluate_profile_change. Choice: investigate_data_path (confidence 0.71, act route). Tool: query_apn_session_app_diagnostics. Result: PDN sessions and APN OK; ingest HTTP 5xx rate 0.98, rejecting payloads since deploy ingest-v2.14.\n- **Step 2:** Same exclusions, plus investigate_data_path. Choice: escalate_or_wait (confidence 0.09, gather_evidence route). Tool: query_firmware_modem_diagnostics. Result: firmware uniform, modem resets 0.1/day, no reject cause.\n- **Step 3:** Only the fallback was admissible. Tool: defer_or_escalate. Result: escalated.\n\n**Outcome**\nNot restored. Rates after the last step: attach 0.997, data session 0.99, app_ack 0.02, heartbeat 0.99. No profile change was made, so none needs approval.\n\n**Next**\n- Escalate to the ingestion owners: the evidence points to ingest-v2.14 rejecting payloads. Consider rolling it back or hotfixing it.\n- Do not change the profile. The cellular path is healthy.\n- Verify app_ack recovers after any ingest fix.",
+ "report_after_fallback": false,
+ "bedrock_error": null,
  "bedrock_usage": {
-  "inputTokens": 7657,
-  "outputTokens": 685,
-  "totalTokens": 8342
+  "inputTokens": 7537,
+  "outputTokens": 814,
+  "totalTokens": 8351
  },
  "advance_calls": 3,
  "decider_source": "live http://127.0.0.1:8099"

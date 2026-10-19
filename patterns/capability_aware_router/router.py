@@ -46,8 +46,8 @@ def inconsistent(raw: dict, options: dict) -> str | None:
     """Checks a `choice` answer against the question it answers. None if consistent, else what is wrong.
     Every real answer satisfies these (probabilities are rounded to 4 decimals, hence the tolerance)."""
     p, n = raw["probabilities"], len(options)
-    if not all(isinstance(v, (int, float)) for v in p.values()):
-        return "non-numeric probabilities"
+    if not all(isinstance(v, (int, float)) and 0 <= v <= 1 for v in [*p.values(), raw["confidence"]]):
+        return "probabilities and confidence must be numbers in [0, 1]"  # also rejects NaN
     if set(p) != set(options):
         return "probabilities do not cover exactly the offered options"
     if abs(sum(p.values()) - 1) > 2e-3:

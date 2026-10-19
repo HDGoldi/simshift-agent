@@ -30,7 +30,9 @@ def test_inconsistent_answer_fails_closed():
     for probs, conf in (({"a": 0.9, "b": 0.05, "look": 0.05, "hold": 0.05}, None),  # sums to 1.05
                         ({"a": 0.2, "b": 0.6, "look": 0.1, "hold": 0.1}, None),  # choice is not the argmax
                         ({"a": 0.7, "b": 0.1, "look": 0.1, "hold": 0.1}, 0.99),  # confidence not derived
-                        ({"a": 0.7, "b": 0.3}, None)):  # options missing
+                        ({"a": 0.7, "b": 0.3}, None),  # options missing
+                        ({"a": 1.1, "b": -0.1, "look": 0.0, "hold": 0.0}, None),  # sums to 1 but out of range
+                        ({"a": float("nan"), "b": 0.5, "look": 0.25, "hold": 0.25}, float("nan"))):  # NaN
         r, agent, seen = setup(FakeDecider("a", probs, conf))
         d, _ = r.step(agent, {})
         assert (d.selected, d.route, seen) == ("hold", "fallback", ["hold"]) and "inconsistent" in d.reason, probs

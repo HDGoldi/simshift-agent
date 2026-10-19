@@ -44,8 +44,8 @@
      },
      "confidence": 0.0586,
      "model": "strands-decider-2B-qwen3.5-v1-2610",
-     "latency_ms": 129.38,
-     "client_latency_ms": 156.7
+     "latency_ms": 118.83,
+     "client_latency_ms": 135.7
     },
     "selected": "investigate_data_path",
     "route": "gather_evidence",
@@ -113,8 +113,8 @@
      },
      "confidence": 0.3118,
      "model": "strands-decider-2B-qwen3.5-v1-2610",
-     "latency_ms": 119.89,
-     "client_latency_ms": 123.6
+     "latency_ms": 101.11,
+     "client_latency_ms": 103.5
     },
     "selected": "escalate_or_wait",
     "route": "fallback",
@@ -184,11 +184,13 @@
   }
  ],
  "mode": "orchestrated",
- "report": "**What happened** (simulated environment): 1,250 CL devices on CL-NET-1 went silent. Attach, data session, app ack and heartbeat rates were all 0.0. The management path was unreachable, no firmware change was recorded, and retries had already been attempted twice.\n\n**Decisions**\n- **Step 1:** Policy removed try_allowed_operator (active profile_A permits no other operator), investigate_device (devices unreachable, no modem logs) and evaluate_profile_change (no management path to the IPA). The decider chose investigate_data_path at confidence 0.06, routed as gather_evidence. Result: zero network-side attach attempts in 6h; last known cells normal, with a power or field issue suspected.\n- **Step 2:** Policy also removed investigate_data_path, since its evidence was already collected. The decider chose escalate_or_wait at confidence 0.31, routed as fallback because no read-only option remained. Result: escalated, with the same evidence attached.\n\n**Outcome**\nRates after the last step remain 0.0 on all four metrics. Not restored. The active profile is unchanged (profile_A), and no profile change was made or approved. The alternative profile is installed, but the OTA change was blocked by policy because there is no management path.\n\n**Next**\n- Dispatch a field engineer to check site power and RF at the affected cells.\n- Restore the management path to the IPA, then re-evaluate the profile change. Any change needs approval.\n- Rerun SIMShift once the path is restored.",
+ "report": "**What happened**\nSimulated scenario: 1,250 devices in CL on CL-NET-1 went silent. All four rates were 0.0 at the start. Management path unreachable, no recent firmware change, 2 retries already attempted, active profile_A (no other operator permitted), alternative profile installed.\n\n**Decisions**\n- **Step 1:** Policy removed try_allowed_operator, investigate_device, and evaluate_profile_change. The model chose investigate_data_path (p=0.37, confidence 0.06). Route: gather_evidence. Tool: query_apn_session_app_diagnostics. Result: 0 network-side attach attempts in 6h; last known cells normal; power/field issue suspected.\n- **Step 2:** Policy also removed investigate_data_path (evidence already collected). The model chose escalate_or_wait (p=0.66, confidence 0.31). Route: fallback, since no read-only option remained. Tool: defer_or_escalate. Result: escalated=true.\n\n**Outcome**\nRates after the last step: attach 0.0, data session 0.0, app ack 0.0, heartbeat 0.0. Not restored. No profile change was made; OTA change was blocked by policy because the management path is unreachable. No operator change was permitted.\n\n**Next**\n- Field team to check power and site conditions at the affected cells, since the diagnostics point to a physical cause.\n- Restore the management path to the IPA, then re-evaluate the profile change, which needs approval.\n- Escalation has been logged for the on-call engineer.\n\nNote: this entire run was simulated.",
+ "report_after_fallback": false,
+ "bedrock_error": null,
  "bedrock_usage": {
   "inputTokens": 5030,
-  "outputTokens": 709,
-  "totalTokens": 5739
+  "outputTokens": 654,
+  "totalTokens": 5684
  },
  "advance_calls": 2,
  "decider_source": "live http://127.0.0.1:8099"

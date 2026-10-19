@@ -1,11 +1,12 @@
 """SIMShift Recovery Decision Inspector: a local web UI over the same Incident the CLI runs.
 
     python -m simshift.web                              # live Decider at $DECIDER_URL (default :8099)
-    python -m simshift.web --replay-dir docs/sample-runs  # recorded real Decider answers, no server needed
+    python -m simshift.web --replay-dir docs/sample-runs/orchestrated  # recorded real Decider answers, no server
     python -m simshift.web --bedrock                    # also ask Bedrock to review plans and explain outcomes
     open http://127.0.0.1:8090
 
-Binds to 127.0.0.1 only and has no authentication: a local demo, not a service.
+Binds to 127.0.0.1 only and has no authentication: a local demo, not a service. Requests must carry a local Host
+header, and POSTs must be JSON from this origin, so another web page or a DNS-rebound name cannot drive it.
 """
 from __future__ import annotations
 
@@ -41,6 +42,8 @@ class App:
             return ReplayDecider([t["decision"] for t in json.load(f)["trace"]]), f"replay of {path}"
 
     def create(self, scenario: str) -> dict:
+        if not isinstance(scenario, str):
+            raise ValueError("scenario must be a string")
         if scenario not in SCENARIOS:
             raise LookupError("unknown scenario")
         decider, source = self._decider(scenario)
@@ -82,7 +85,9 @@ class App:
                     raise PermissionError("awaiting human approval" if inc.pending_approval else "incident finished")
                 inc.step()
             elif action == "approval":
-                inc.resolve_approval(bool(body.get("approved")))
+                if not isinstance(body.get("approved"), bool):  # bool("false") is True: accept only true/false
+                    raise ValueError("approved must be true or false")
+                inc.resolve_approval(body["approved"])
             elif action == "counterfactual":
                 if body.get("option") not in OPTIONS:
                     raise LookupError("unknown option")
@@ -108,7 +113,22 @@ def handler(app: App):
         def _json(self, code: int, obj) -> None:
             self._send(code, json.dumps(obj, default=str).encode())
 
+        def _local(self, post: bool) -> bool:
+            hosts = {f"{h}:{self.server.server_address[1]}" for h in ("127.0.0.1", "localhost")}
+            if self.headers.get("host") not in hosts:  # DNS rebinding sends a foreign Host
+                return False
+            if not post:
+                return True
+            origin = self.headers.get("origin")
+            # A cross-site page can only send JSON after a CORS preflight, which this server never answers.
+            return ((origin is None or origin.removeprefix("http://") in hosts)
+                    and (self.headers.get("content-type") or "").startswith("application/json"))
+
         def do_GET(self):
+            if not self._local(post=False):
+                return self._json(403, {"error": "local requests only"})
+            if self.path == "/favicon.ico":
+                return self._send(204, b"", "image/x-icon")
             if self.path in ("/", "/index.html"):
                 return self._send(200, (STATIC / "index.html").read_bytes(), "text/html; charset=utf-8")
             if self.path in ("/app.js", "/style.css"):
@@ -120,7 +140,17 @@ def handler(app: App):
             self._route(lambda parts: app.snapshot(int(parts[2])) if len(parts) == 3 else None)
 
         def do_POST(self):
-            body = json.loads(self.rfile.read(int(self.headers.get("content-length") or 0)) or b"{}")
+            if not self._local(post=True):
+                return self._json(403, {"error": "JSON requests from this page only"})
+            n = int(self.headers.get("content-length") or 0)
+            if not 0 <= n <= 65536:
+                return self._json(413, {"error": "body too large"})
+            try:
+                body = json.loads(self.rfile.read(n) or b"{}")
+            except ValueError:
+                return self._json(400, {"error": "body must be JSON"})
+            if not isinstance(body, dict):
+                return self._json(400, {"error": "body must be a JSON object"})
             self._route(lambda parts: app.create(body.get("scenario")) if parts == ["api", "incidents"]
                         else app.act(int(parts[2]), parts[3], body) if len(parts) == 4 else None)
 
@@ -134,6 +164,8 @@ def handler(app: App):
                 self._json(409, {"error": str(e)})
             except (LookupError, OSError, ValueError) as e:  # OSError: no recording for this scenario
                 self._json(400 if isinstance(e, ValueError) else 404, {"error": str(e)})
+            except Exception as e:  # anything else, e.g. Bedrock unreachable: answer instead of dropping the socket
+                self._json(500, {"error": f"{type(e).__name__}: {e}"})
 
         def log_message(self, *a):
             pass

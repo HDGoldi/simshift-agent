@@ -1,5 +1,7 @@
 """UI backend over HTTP, on recorded real Decider answers (no Decider server, no AWS)."""
+import http.client
 import json
+import os
 import threading
 import urllib.error
 import urllib.request
@@ -12,7 +14,8 @@ from simshift.web import App, serve
 
 @pytest.fixture(scope="module")
 def base():
-    srv = serve(App("http://127.0.0.1:1", replay_dir="docs/sample-runs/orchestrated"), port=0)
+    runs = os.path.join(os.path.dirname(__file__), "..", "docs", "sample-runs", "orchestrated")
+    srv = serve(App("http://127.0.0.1:1", replay_dir=runs), port=0)
     threading.Thread(target=srv.serve_forever, daemon=True).start()
     yield f"http://127.0.0.1:{srv.server_address[1]}"
     srv.shutdown()
@@ -69,3 +72,35 @@ def test_bad_requests(base):
     _, s = call(base, "/api/incidents", {"scenario": "OFFLINE"})
     assert call(base, f"/api/incidents/{s['id']}/approval", {"approved": True})[0] == 400
     assert call(base, f"/api/incidents/{s['id']}/explain", {})[0] == 409  # Bedrock off
+
+
+def raw_post(base, path, body: bytes, headers: dict):
+    host, port = base.removeprefix("http://").split(":")
+    c = http.client.HTTPConnection(host, int(port), timeout=5)
+    c.request("POST", path, body, headers)
+    r = c.getresponse()
+    return r.status, r.read()
+
+
+def test_cross_origin_and_rebinding_requests_are_refused(base):
+    ok = {"content-type": "application/json"}
+    body = json.dumps({"scenario": "BR_PROFILE"}).encode()
+    assert raw_post(base, "/api/incidents", body, {"content-type": "text/plain"})[0] == 403  # CORS-simple request
+    assert raw_post(base, "/api/incidents", body, {**ok, "origin": "https://evil.example"})[0] == 403
+    assert raw_post(base, "/api/incidents", body, {**ok, "host": "attacker.example:8090"})[0] == 403  # DNS rebinding
+    assert raw_post(base, "/api/incidents", body, {**ok, "origin": base})[0] == 200  # the UI itself
+
+
+def test_approval_must_be_a_literal_boolean(base):
+    _, s = call(base, "/api/incidents", {"scenario": "BR_PROFILE"})
+    while not (s["done"] or s["pending_approval"]):
+        s = call(base, f"/api/incidents/{s['id']}/step", {})[1]
+    for bad in ("false", "true", 1, None):
+        assert call(base, f"/api/incidents/{s['id']}/approval", {"approved": bad})[0] == 400
+    assert call(base, f"/api/incidents/{s['id']}")[1]["profiles"]["active"] == "profile_A"  # nothing executed
+
+
+def test_malformed_bodies_get_an_http_error(base):
+    ok = {"content-type": "application/json"}
+    for body in (b"{not json", b"[1]", json.dumps({"scenario": ["x"]}).encode()):
+        assert raw_post(base, "/api/incidents", body, ok)[0] == 400, body

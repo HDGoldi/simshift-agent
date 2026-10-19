@@ -39,11 +39,13 @@ Code: [`simshift/agent.py`](../simshift/agent.py) (`Incident`: one steppable ses
 |---|---|---|
 | `python -m simshift.agent` | a Python `while not done` loop | the original recorded runs; `--replay` |
 | `python -m simshift.orchestrator` | a Strands agent on Bedrock with two zero-argument tools, `get_incident_state` and `advance_recovery` | the "Bedrock runs the agent" mode; its report replaces the explanation |
-| `python -m simshift.web` | a person pressing *Next step*, plus a real approval dialog | the Recovery Decision Inspector UI |
+| `python -m simshift.web` | a person pressing *Next step*, plus a real approval dialog | the Recovery Decision Inspector UI (127.0.0.1 only; it refuses requests whose Host is not local and POSTs that are not JSON from its own page, so another web page or a rebound host name cannot drive it) |
 
 In orchestrator mode Bedrock decides when to look, when to advance and how to report. `advance_recovery` has no
 parameters, so Bedrock cannot name a recovery tool, skip the policy or approve a change. If Bedrock stops early, the
-incident is finished deterministically and `advance_calls` in the trace shows it. All six orchestrated runs in
+incident is finished deterministically and Bedrock is asked to rewrite its report for the final trace
+(`report_after_fallback` in the result). If a Bedrock call fails, the incident is still finished and the error is
+recorded. The two tools share a budget of 16 calls; past it they stop the agent loop. All six orchestrated runs in
 [`docs/sample-runs/orchestrated/`](sample-runs/orchestrated/) replay to the same tools through the plain loop.
 
 ## Role boundaries
@@ -102,13 +104,21 @@ Decider's options beforehand:
 - the fleet owner authorizes switching;
 - a human approved.
 
-Independently of the gate, the virtual eIM refuses an enable command that carries no approval, and one it cannot
-deliver because the management path is down. It does not repeat the gate's other checks.
+Independently of the gate, the virtual eIM refuses an enable command whose approval does not match the proposal, and
+one it cannot deliver because the management path is down. It does not repeat the gate's other checks. A test
+replaces the gate with one that always passes and checks that the eIM still refuses an unapproved switch.
+
+**A profile change that does not restore service is handed off.** If the gate blocks it for any reason other than a
+pending approval, the eIM cannot deliver it, verification fails and it is rolled back, rollback itself fails, or the
+tool errors, the next step escalates with a note that names how it ended. The Bedrock plan review is advisory: if it
+fails, the error is recorded in place of the review and the proposal still goes to the gate.
 
 **Approval is bound to one proposal.** The gate's `human_approval` check passes only for the proposal id
 `hash(cohort, from profile, to profile).<number of switches already executed>`. An approval cannot be reused for
 another target, and once the switch it approved has run (even if it was rolled back), a new attempt needs a new
-approval. This is a consistency binding inside the simulation, not authentication.
+approval. The CLI and the UI show that id and ask a person. The CLI's `--approve` flag pre-approves every proposal a
+run makes; it exists for demos, replays and the benchmark, and there the binding only prevents reuse after execution.
+This is a consistency binding inside the simulation, not authentication.
 
 **Every attempt records its eUICC transition path**, and the code refuses any path outside this list:
 

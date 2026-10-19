@@ -179,3 +179,22 @@ def test_transient_clears_on_retry_only():
     assert not twin.service_restored()
     twin.retry_with_backoff()
     assert twin.service_restored() and twin.s["active_profile"] == "profile_A"
+
+
+def test_rollback_needs_the_same_management_path_as_enable():
+    twin = FleetTwin("TRANSIENT")  # management rides on cellular
+    twin.s["networks"]["FR-NET-2"] = "down"
+    assert twin.enable_profile("profile_B", "k", approved=True)["ok"]  # direct eIM call while still registered
+    assert not twin.management_reachable()  # profile_B cannot register, so the cellular path is gone
+    assert not twin.rollback_profile("profile_A", "FR-NET-1")["ok"]
+
+
+def test_eim_still_refuses_if_the_gate_were_broken(monkeypatch):
+    from simshift import policy
+    twin = FleetTwin("BR_PROFILE")
+    real = policy.profile_transition_gate
+    monkeypatch.setattr(policy, "profile_transition_gate",
+                        lambda t, target, a: {**real(t, target, a), "allowed": True, "failed": []})  # broken gate
+    out = policy.guarded_profile_transition(twin, "profile_B", None)  # no approval at all
+    assert not out["executed"] and out["transition"][-1] == "NOT_DELIVERED"
+    assert twin.s["active_profile"] == "profile_A" and "no operator approval" in out["eim"]["reason"]

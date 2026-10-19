@@ -79,27 +79,29 @@ real Strands event loop with a scripted model to prove it ([`tests/test_orchestr
 | `FW_LOOP` | modem diagnostics (conf 0.39, read-only) find a reset loop after a firmware rollout → retries and profile change excluded → data-path check → escalate | handed to the device team; no network or eSIM change |
 | `TRANSIENT` | Decider picks `retry_connection` (conf 0.79) | restored by one bounded retry |
 
-Single runs on 2026-10-18. Traces: [docs/sample-runs/](docs/sample-runs/) (Python loop) and
-[docs/sample-runs/orchestrated/](docs/sample-runs/orchestrated/) (Bedrock-orchestrated, all six scenarios).
+Single runs on 2026-10-18 and 2026-10-19. Traces: [docs/sample-runs/orchestrated/](docs/sample-runs/orchestrated/) (Bedrock-orchestrated,
+all six scenarios) and [docs/sample-runs/](docs/sample-runs/) (the first Python-loop runs of the four original
+scenarios, kept as recorded; they use the earlier trace format and still replay and validate in CI).
 Per-step numbers, latencies and the known Decider misses: [docs/measurements.md](docs/measurements.md).
 
 ## Benchmark: Decider vs Bedrock-only vs rules vs random
 
 60 generated incidents across the six families, every chooser running through the same router, policy and gate
-([full table and raw answers](docs/benchmark/benchmark-2026-10-18.md)):
+([full table and raw answers](docs/benchmark/benchmark-2026-10-18.md)). An escalation only counts as correct if the
+diagnostic that finds the cause ran first.
 
-| | rules | random | **Decider** | Bedrock-only |
-|---|---:|---:|---:|---:|
-| Correct end state | 95.0% | 66.7% | **100.0%** | 95.0% |
-| First action acceptable | 95.0% | 46.7% | **86.7%** | 81.7% |
-| Chooser latency p50 | — | — | **100 ms** | 1,908 ms |
-| Bedrock tokens | 0 | 0 | **0** | 68,079 |
-| Forbidden executions (audited) | 0 | 0 | 0 | 0 |
+| | rules | random | **Decider** | Bedrock | Bedrock + stated confidence |
+|---|---:|---:|---:|---:|---:|
+| Correct end state, with the evidence | 95.0% | 51.7% | **96.7%** | 93.3% | 90.0% |
+| First action acceptable | 95.0% | 46.7% | **86.7%** | 83.3% | 81.7% |
+| Chooser latency p50 | — | — | **101 ms** | 2,060 ms | 2,066 ms |
+| Bedrock tokens | 0 | 0 | **0** | 70,559 | 71,783 |
+| Forbidden executions (audited) | 0 | 0 | 0 | 0 | 0 |
 
 Decider's raw first pick was the preferred tool only half the time; the confidence routing turned its uncertain picks
-into read-only evidence gathering, and every incident ended correctly. Bedrock-only picked the preferred first tool
-more often (81.7%) but never retried first on transient incidents. **These are synthetic incidents from families we
-designed**, Decider ran on a laptop GPU and Bedrock in eu-central-1, and each chooser ran once. Read the caveats in
+into read-only evidence gathering. Bedrock picked better first tools (83.3%), but its stated confidence never dropped
+below 0.60, so the same routing never held it back. **These are synthetic incidents from families we designed**,
+Decider ran on a laptop GPU and Bedrock in eu-central-1, and each chooser ran once. Read the caveats in
 [docs/measurements.md](docs/measurements.md#benchmark) before quoting any of it.
 
 ## Run it
@@ -107,7 +109,7 @@ designed**, Decider ran on a laptop GPU and Bedrock in eu-central-1, and each ch
 ```bash
 git clone https://github.com/HDGoldi/simshift-agent && cd simshift-agent
 make install                     # or: uv venv && uv pip install -e . pytest
-make test                        # 68 tests + trace validation; no Decider server or AWS needed
+make test                        # 93 tests + trace validation; no Decider server or AWS needed
 make ui                          # Recovery Decision Inspector on recorded real Decider answers: http://127.0.0.1:8090
 make replay                      # re-run all six recorded traces against the current code
 ```
@@ -124,17 +126,18 @@ uv venv && uv pip install -e ".[mlx]"        # Apple silicon; elsewhere: uv pip 
 .venv/bin/strands-decider serve StrandsAgents/strands-decider-2B-qwen3.5-v1-2610 --device mlx --port 8099
 
 # 2. In simshift-agent. Needs AWS credentials with Bedrock access.
-AWS_PROFILE=<your-profile> .venv/bin/python -m simshift.agent BR_PROFILE --approve --out runs/br.json   # Python loop
-AWS_PROFILE=<your-profile> .venv/bin/python -m simshift.orchestrator BR_PROFILE --approve              # Bedrock runs the loop
+AWS_PROFILE=<your-profile> .venv/bin/python -m simshift.agent BR_PROFILE --out runs/br.json   # asks you to approve
+AWS_PROFILE=<your-profile> .venv/bin/python -m simshift.orchestrator BR_PROFILE --approve    # Bedrock runs the loop
 AWS_PROFILE=<your-profile> make ui-live                                                                # UI with real approval
 .venv/bin/python -m simshift.agent OFFLINE --no-bedrock
 AWS_PROFILE=<your-profile> .venv/bin/python -m simshift.benchmark --stamp mine                          # writes docs/benchmark/
 ```
 
 Settings: `DECIDER_URL` (default `http://127.0.0.1:8099`), `SIMSHIFT_BEDROCK_MODEL` (default
-`eu.anthropic.claude-haiku-5-5`), `AWS_REGION` (default `eu-central-1`). On the CLI, `--approve` is the human
-operator's pre-approval for whatever profile switch gets proposed; without it the gate stops at `human_approval`.
-In the UI a person approves or declines the exact proposal in a dialog.
+`eu.anthropic.claude-haiku-5-5`), `AWS_REGION` (default `eu-central-1`). When a profile switch is proposed, the CLI
+shows the proposal id and asks you to approve or decline it, and the UI does the same in a dialog; the approval only
+matches that exact proposal. `--approve` is a scripted pre-approval of every proposal the run makes, for demos,
+replays and the benchmark. Without a terminal and without `--approve`, the proposal stays pending.
 
 The UI binds to 127.0.0.1 only and has no authentication. It shows the state sent to Decider, the removed options and
 why, Decider's probabilities, the route, the gate checklist, the eUICC transition path, counterfactuals on a cloned
@@ -144,13 +147,15 @@ twin, and Bedrock's plan review and explanation.
 
 ## Tests
 
-`make test` runs 68 tests and validates every published trace. Without AWS credentials and a Decider server, 67 pass
-and the real-Decider test skips (set `SIMSHIFT_REQUIRE_DECIDER=1` to make that a failure). Bedrock is never called in
-tests. The acceptance properties covered:
+`make test` runs 93 tests and validates every published trace and the benchmark file. Without AWS credentials and a
+Decider server, 92 pass and the real-Decider test skips (set `SIMSHIFT_REQUIRE_DECIDER=1` to make that a failure).
+Bedrock is never called in tests. The acceptance properties covered:
 - Decider's choice controls which Strands tool runs; Bedrock in orchestrator mode cannot change it.
 - Excluded options are never offered and are denied on any call path; an independent audit counts violations.
 - Unreachable devices never get an OTA change, not even a forced one on a clone.
-- A profile change needs an approval bound to that exact proposal; the virtual eIM refuses an unapproved enable.
+- A profile change needs an approval bound to that exact proposal; the virtual eIM checks it again on its own.
+- A blocked, failed or rolled-back profile change, or a failed Bedrock review, ends in a handoff, never a silent stop.
+- The UI refuses requests from other web pages and rebound host names.
 - Brazil restores both registration and telemetry; a failed verification rolls back.
 - No hidden truth reaches Decider, Bedrock or the UI.
 - A Decider outage, a malformed or inconsistent answer, or an off-menu answer fails closed.
@@ -165,7 +170,7 @@ simshift/orchestrator.py            Bedrock-run loop with two zero-argument tool
 simshift/web.py, simshift/static/   Recovery Decision Inspector UI (stdlib HTTP server, no extra dependencies)
 simshift/policy.py                  option descriptions, exclusions, profile gate, transition paths, counterfactuals
 simshift/simulator.py               deterministic fleet twin + virtual eIM/IPA/eUICC, 6 scenarios
-simshift/benchmark.py               incident generator and the four-chooser benchmark
+simshift/benchmark.py               incident generator and the five-chooser benchmark
 simshift/validate.py                trace validator run in CI
 tests/                              agent, orchestrator, UI, twin, policy, benchmark and validator tests
 docs/                               architecture, measurements, benchmark, sample traces, screenshots, article, submission

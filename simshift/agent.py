@@ -9,8 +9,10 @@ it never selects the routine next tool and never authorizes a change.
 from __future__ import annotations
 
 import argparse
+import functools
 import json
 import os
+import sys
 from dataclasses import asdict
 from typing import Callable
 
@@ -35,7 +37,6 @@ TOOLS = {
     "evaluate_profile_change": "prepare_guarded_profile_transition",
     "escalate_or_wait": "defer_or_escalate",
 }
-TERMINAL = {"evaluate_profile_change", "escalate_or_wait"}
 MAX_STEPS = 6
 BEDROCK_MODEL = os.environ.get("SIMSHIFT_BEDROCK_MODEL", "eu.anthropic.claude-haiku-5-5")
 REGION = os.environ.get("AWS_REGION", "eu-central-1")
@@ -45,6 +46,12 @@ class ProfilePlan(BaseModel):
     recommend_proceeding: bool
     rationale: str
     risks: list[str]
+
+
+@functools.cache
+def bedrock_model() -> BedrockModel:
+    """One Bedrock client per process; creating the boto3 session per incident cost about 0.1 s each."""
+    return BedrockModel(model_id=BEDROCK_MODEL, region_name=REGION, max_tokens=2048)
 
 
 def _bedrock(llm: BedrockModel, prompt: str, schema=None):
@@ -83,11 +90,14 @@ def build_tools(twin: FleetTwin, approver: Callable[[str], bool], llm: BedrockMo
         target = next(p for p in twin.s["profiles"] if p != twin.s["active_profile"])
         pid = proposal_id(twin, target)
         if llm and pid not in plans:
-            plans[pid] = _bedrock(llm, (
-                "You review a proposed eSIM profile switch for a cohort of cellular IoT devices. This is a simulation. "
-                "Decide whether proceeding is advisable and list concrete risks. You do not authorize anything.\n"
-                f"Observed state: {json.dumps(twin.observe())}\nProfiles: {json.dumps(twin.get_profiles())}\n"
-                f"Proposed target: {target}"), ProfilePlan)
+            try:  # advisory only: a failed review must never keep the proposal from the deterministic gate
+                plans[pid] = _bedrock(llm, (
+                    "You review a proposed eSIM profile switch for a cohort of cellular IoT devices. This is a simulation. "
+                    "Decide whether proceeding is advisable and list concrete risks. You do not authorize anything.\n"
+                    f"Observed state: {json.dumps(twin.observe())}\nProfiles: {json.dumps(twin.get_profiles())}\n"
+                    f"Proposed target: {target}"), ProfilePlan)
+            except Exception as e:  # any Bedrock or structured-output failure is recorded, not raised
+                plans[pid] = {"error": f"Bedrock review unavailable: {e!r}"}
         approval = pid if approver(pid) else None
         return {"target": target, "bedrock_plan": plans.get(pid),
                 **guarded_profile_transition(twin, target, approval)}
@@ -138,7 +148,7 @@ class Incident:
         self.scenario_id, self.pre_approved, self.use_bedrock = scenario_id, approve, use_bedrock
         self.twin = twin = FleetTwin(scenario_id)
         self.router = make_router(decider or DeciderClient(os.environ.get("DECIDER_URL", "http://127.0.0.1:8099")))
-        self.llm = BedrockModel(model_id=BEDROCK_MODEL, region_name=REGION, max_tokens=2048)
+        self.llm = bedrock_model()
         self.approved: set[str] = set()  # proposal ids a human approved during the session
         self.agent = Agent(model=self.llm, tools=build_tools(twin, lambda pid: approve or pid in self.approved,
                                                              self.llm if use_bedrock else None),
@@ -164,11 +174,19 @@ class Incident:
 
     @property
     def done(self) -> bool:
+        """Restored, handed off, or waiting for a human. A failed, blocked or errored profile change is not an end
+        state: the next step hands it off."""
         last = self.trace[-1] if self.trace else None
-        return bool(self.twin.service_restored() or (last and (last["decision"] is None or last["decision"]["selected"]
-                                                                in TERMINAL)))
+        return bool(self.twin.service_restored() or self.pending_approval
+                    or (last and last["tool"] == TOOLS[FALLBACK]))
 
     def step(self) -> dict:
+        last = self.trace[-1] if self.trace else None
+        if last and last["tool"] == TOOLS["evaluate_profile_change"]:  # it did not restore service: hand off
+            res = last["tool_result"]
+            end = res.get("transition", ["?"])[-1] if isinstance(res, dict) else f"with a tool error: {res}"
+            return self._record(None, self.agent.tool.defer_or_escalate(), tool=TOOLS[FALLBACK],
+                                note=f"profile change ended {end}; handing off")
         if len(self.trace) >= MAX_STEPS:  # step limit without a terminal action: hand off, never stop silently
             return self._record(None, self.agent.tool.defer_or_escalate(), tool=TOOLS[FALLBACK],
                                 note=f"step limit {MAX_STEPS} reached")
@@ -197,13 +215,16 @@ class Incident:
     def result(self, explain: bool | None = None) -> dict:
         outcome, explanation = self.outcome(), None
         if self.use_bedrock if explain is None else explain:
-            explanation = _bedrock(self.llm, (
-                "Explain in at most 120 words, for a NOC engineer, what this simulated recovery agent did and why. "
-                "Separate what was observed from what is uncertain. Do not invent facts beyond the trace.\n"
-                + json.dumps({"trace": [{k: t[k] for k in ("step", "tool", "tool_result")} |
-                                        ({"decider": t["decision"]["raw"], "route": t["decision"]["route"],
-                                          "excluded": t["decision"]["excluded"]} if t["decision"] else {"note": t["note"]})
-                                        for t in self.trace], "outcome": outcome})))
+            try:
+                explanation = _bedrock(self.llm, (
+                    "Explain in at most 120 words, for a NOC engineer, what this simulated recovery agent did and why. "
+                    "Separate what was observed from what is uncertain. Do not invent facts beyond the trace.\n"
+                    + json.dumps({"trace": [{k: t[k] for k in ("step", "tool", "tool_result")} |
+                                            ({"decider": t["decision"]["raw"], "route": t["decision"]["route"],
+                                              "excluded": t["decision"]["excluded"]} if t["decision"] else {"note": t["note"]})
+                                            for t in self.trace], "outcome": outcome})))
+            except Exception as e:  # the trace matters more than the prose: keep it even if Bedrock fails
+                explanation = f"Bedrock explanation unavailable: {e!r}"
         return {"scenario": self.scenario_id, "title": SCENARIOS[self.scenario_id]["title"],
                 "approved": self.pre_approved, "bedrock_model": BEDROCK_MODEL if self.use_bedrock else None,
                 "trace": self.trace, "outcome": outcome, "explanation": explanation, "events": self.twin.events}
@@ -240,10 +261,20 @@ def _print(r: dict, decider_source: str) -> None:
         print(f"\nBedrock ({r['bedrock_model']}): {r['explanation']}")
 
 
+def write_trace(path: str, res: dict) -> None:
+    """Atomic: an interrupted run never leaves a half-written trace."""
+    os.makedirs(os.path.dirname(path) or ".", exist_ok=True)
+    with open(path + ".tmp", "w") as f:
+        json.dump(res, f, indent=1)
+    os.replace(path + ".tmp", path)
+
+
 if __name__ == "__main__":
     ap = argparse.ArgumentParser()
     ap.add_argument("scenario", choices=list(SCENARIOS))
-    ap.add_argument("--approve", action="store_true", help="operator pre-approves a profile switch if one is proposed")
+    ap.add_argument("--approve", action="store_true",
+                    help="scripted pre-approval of every proposal this run makes (demos, replays, benchmark). "
+                         "Without it you are asked to approve the exact proposal when one is pending.")
     ap.add_argument("--no-bedrock", action="store_true")
     ap.add_argument("--out", help="write full JSON trace here")
     ap.add_argument("--replay", metavar="TRACE.json",
@@ -255,11 +286,21 @@ if __name__ == "__main__":
     else:
         url = os.environ.get("DECIDER_URL", "http://127.0.0.1:8099")
         decider, source = DeciderClient(url), f"live {url}"
-    res = run(a.scenario, approve=a.approve, decider=decider, use_bedrock=not a.no_bedrock)
+    inc = Incident(a.scenario, approve=a.approve, decider=decider, use_bedrock=not a.no_bedrock)
+    while True:
+        while not inc.done:
+            inc.step()
+        if not (inc.pending_approval and sys.stdin.isatty()):
+            break  # no proposal waiting, or nobody at a terminal to answer it: it stays pending
+        gate = inc.trace[-1]["tool_result"]["gate"]
+        try:
+            answer = input(f"\nApprove proposal {inc.pending_approval}: enable {gate['target']} on "
+                           f"{inc.twin.s['devices']} devices? Every other check passed. [y/N] ")
+        except EOFError:
+            break  # no answer: the proposal stays pending
+        inc.resolve_approval(answer.strip().lower() == "y")
+    res = inc.result()
     res["decider_source"] = source
     _print(res, source)
-    if a.out:  # atomic: an interrupted run never leaves a half-written trace
-        os.makedirs(os.path.dirname(a.out) or ".", exist_ok=True)
-        with open(a.out + ".tmp", "w") as f:
-            json.dump(res, f, indent=1)
-        os.replace(a.out + ".tmp", a.out)
+    if a.out:
+        write_trace(a.out, res)

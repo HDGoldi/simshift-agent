@@ -307,7 +307,7 @@ class FleetTwin:
     def rollback_profile(self, previous: str, previous_operator: str) -> dict:
         if not self.s["euicc"]["rollback_supported"]:
             return self._log("eim_rollback", ok=False, reason="rollback not supported")
-        if not self.s["management"]["up"]:
+        if not self.management_reachable():  # same path rule as enable: a cellular path needs a registered profile
             return self._log("eim_rollback", ok=False, reason="IPA unreachable; rollback not delivered")
         self.commands.clear()  # earlier enable results are superseded; a new attempt must really execute
         self.s["active_profile"], self.s["serving_operator"] = previous, previous_operator

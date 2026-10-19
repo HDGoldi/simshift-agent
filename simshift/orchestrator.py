@@ -15,10 +15,10 @@ import argparse
 import json
 import os
 
-from strands import Agent, tool
+from strands import Agent, ToolContext, tool
 from strands.tools.executors import SequentialToolExecutor
 
-from .agent import Incident, _print
+from .agent import MAX_STEPS, Incident, _print, write_trace
 
 SYSTEM_PROMPT = """You are SIMShift, a recovery agent for a SIMULATED cellular IoT fleet.
 
@@ -42,36 +42,65 @@ def _summary(t: dict, inc: Incident) -> dict:
             "terminal": inc.done}
 
 
-def orchestrator_tools(inc: Incident) -> list:
-    @tool
-    def get_incident_state() -> str:
-        """Return the current observable state of the simulated incident cohort as JSON."""
-        return json.dumps(inc.twin.observe())
+MAX_TOOL_CALLS = 2 * MAX_STEPS + 4  # each step needs at most one look and one advance, plus slack
 
-    @tool
-    def advance_recovery() -> str:
+
+def orchestrator_tools(inc: Incident) -> list:
+    calls = {"advance": 0, "total": 0}
+
+    def over_budget(ctx: ToolContext) -> str | None:
+        calls["total"] += 1
+        if calls["total"] <= MAX_TOOL_CALLS:
+            return None
+        ctx.invocation_state.setdefault("request_state", {})["stop_event_loop"] = True  # a runaway loop ends here
+        return json.dumps({"error": "tool budget exhausted; the incident is finished deterministically",
+                           "terminal": True})
+
+    @tool(context="tool_context")
+    def get_incident_state(tool_context: ToolContext) -> str:
+        """Return the current observable state of the simulated incident cohort as JSON."""
+        return over_budget(tool_context) or json.dumps(inc.twin.observe())
+
+    @tool(context="tool_context")
+    def advance_recovery(tool_context: ToolContext) -> str:
         """Run ONE recovery step. A policy removes inadmissible options, a decision model picks the next tool,
         and that tool runs on the simulated fleet. Returns the decision, the tool result and the new rates."""
+        if stop := over_budget(tool_context):
+            return stop
         if inc.done:
             return json.dumps({"error": "incident finished; write the report now", "terminal": True})
+        calls["advance"] += 1
         return json.dumps(_summary(inc.step(), inc))
 
+    get_incident_state.calls = advance_recovery.calls = calls
     return [get_incident_state, advance_recovery]
 
 
 def orchestrate(scenario_id: str, approve: bool = False, decider=None, model=None) -> dict:
     inc = Incident(scenario_id, approve, decider, use_bedrock=True)
-    agent = Agent(model=model or inc.llm, tools=orchestrator_tools(inc), system_prompt=SYSTEM_PROMPT,
+    tools = orchestrator_tools(inc)
+    agent = Agent(model=model or inc.llm, tools=tools, system_prompt=SYSTEM_PROMPT,
                   tool_executor=SequentialToolExecutor(), callback_handler=None)  # steps never run concurrently
-    reply = agent(f"New incident: {inc.twin.s['incident']}. Follow your procedure.")
-    while not inc.done:  # Bedrock stopped early: finish deterministically (advance_calls < steps shows it)
-        inc.step()
-    usage = reply.metrics.accumulated_usage
-    res = inc.result(explain=False)
-    return {**res, "mode": "orchestrated", "report": str(reply).strip(),
+    report, error, rewritten = None, None, False
+    try:
+        report = str(agent(f"New incident: {inc.twin.s['incident']}. Follow your procedure.")).strip()
+        if not inc.done:  # Bedrock stopped early: finish deterministically, then have it report on the final trace
+            first = len(inc.trace)
+            while not inc.done:
+                inc.step()
+            rest = [_summary(t, inc) for t in inc.trace[first:]]
+            report = str(agent("You stopped before the incident was finished. These steps then ran deterministically:\n"
+                               + json.dumps(rest) + "\nRewrite the full report for the final state.")).strip()
+            rewritten = True
+    except Exception as e:  # Bedrock failed mid-run: the incident still ends safely and the trace is kept
+        error = f"{type(e).__name__}: {e}"
+        while not inc.done:
+            inc.step()
+    usage = agent.event_loop_metrics.accumulated_usage
+    return {**inc.result(explain=False), "mode": "orchestrated", "report": report, "report_after_fallback": rewritten,
+            "bedrock_error": error,
             "bedrock_usage": {k: usage.get(k) for k in ("inputTokens", "outputTokens", "totalTokens")},
-            "advance_calls": sum(m["role"] == "assistant" and any(c.get("toolUse", {}).get("name") == "advance_recovery"
-                                                                for c in m["content"]) for m in agent.messages)}
+            "advance_calls": tools[0].calls["advance"]}
 
 
 if __name__ == "__main__":
@@ -88,9 +117,7 @@ if __name__ == "__main__":
     res["decider_source"] = f"live {url}"
     _print(res, res["decider_source"])
     print(f"\nBedrock report ({res['bedrock_model']}, {res['advance_calls']} advance_recovery calls, "
-          f"{res['bedrock_usage']}):\n{res['report']}")
+          f"{res['bedrock_usage']}{', rewritten after a deterministic finish' if res['report_after_fallback'] else ''}):"
+          f"\n{res['report'] or res['bedrock_error']}")
     if a.out:
-        os.makedirs(os.path.dirname(a.out) or ".", exist_ok=True)
-        with open(a.out + ".tmp", "w") as f:
-            json.dump(res, f, indent=1)
-        os.replace(a.out + ".tmp", a.out)
+        write_trace(a.out, res)

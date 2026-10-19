@@ -4,8 +4,12 @@ Every chooser answers the same typed question through the same CapabilityAwareRo
 profile gate, so only the choice step differs:
   rules    a hand-written runbook over the observable state (domain rules, not fitted to the generator)
   random   uniform over the admissible options
-  decider  Strands Decider 2B (live server)
-  bedrock  an LLM on Bedrock asked to name one option (no probabilities, so it always "acts")
+  decider       Strands Decider 2B (live server)
+  bedrock       an LLM on Bedrock asked to name one option (no probabilities, so the router always acts on it)
+  bedrock+conf  the same LLM asked for an option and a 0-1 confidence, routed by the same 0.5 threshold as Decider
+
+An escalation only counts as a correct end for application and firmware incidents if the diagnostic that finds the
+cause ran first; handing off blind is not a diagnosis.
 
     python -m simshift.benchmark --per-family 10 --choosers rules,random,decider,bedrock --stamp 2026-10-18
 
@@ -29,7 +33,8 @@ from strands.types.exceptions import MaxTokensReachedException
 from patterns.capability_aware_router.router import DeciderClient
 
 from .agent import BEDROCK_MODEL, REGION, Incident
-from .simulator import SCENARIOS
+from .policy import MAX_RESETS_PER_DAY
+from .simulator import RESTORED_THRESHOLD, SCENARIOS
 
 # family -> (preferred first action, acceptable first actions, correct end state)
 FAMILIES = {
@@ -40,7 +45,9 @@ FAMILIES = {
     "firmware": ("investigate_device", {"investigate_device"}, "escalated"),
     "transient": ("retry_connection", {"retry_connection"}, "restored"),
 }
+EVIDENCE = {"application": "data_path", "firmware": "device"}  # diagnostics an escalation must be based on
 COUNTRIES = ["DE", "BR", "JP", "US", "MX", "IN", "ZA", "FR", "KR", "CA"]
+BEDROCK_MAX_TOKENS = 512
 
 
 def make(family: str, seed: int) -> dict:
@@ -94,13 +101,13 @@ class RulesChooser(_OneHot):
 
     def choose(self, state, instructions, options, name="next_tool"):
         resets = state["diagnostics"].get("device", {}).get("modem_resets_per_day", 0)
-        if state["app_ack_rate"] < 0.95 <= state["attach_success_rate"]:
+        if state["app_ack_rate"] < RESTORED_THRESHOLD <= state["attach_success_rate"]:
             order = ["investigate_data_path"]
         elif state["attach_success_rate"] == 0 and not state["management_path_reachable"]:
             order = ["escalate_or_wait"]
         elif state["other_operator_allowed_on_active_profile"]:
             order = ["try_allowed_operator"]
-        elif state["recent_firmware_change"] or state.get("attach_trend") == "flapping" or resets > 5:
+        elif state["recent_firmware_change"] or state.get("attach_trend") == "flapping" or resets > MAX_RESETS_PER_DAY:
             order = ["investigate_device"]
         elif state.get("attach_trend") == "improving" or state["attach_success_rate"] > 0.2:
             order = ["retry_connection"]
@@ -122,15 +129,17 @@ class BedrockChooser(_OneHot):
     """Bedrock names one option. An unparseable answer raises ValueError, which the router turns into the fallback;
     it is counted, not hidden."""
 
-    def __init__(self):
-        self.llm = BedrockModel(model_id=BEDROCK_MODEL, region_name=REGION, max_tokens=512)
+    def __init__(self, with_confidence: bool = False):
+        self.with_confidence = with_confidence
+        self.llm = BedrockModel(model_id=BEDROCK_MODEL, region_name=REGION, max_tokens=BEDROCK_MAX_TOKENS)
         self.tokens = {"inputTokens": 0, "outputTokens": 0}
         self.unparseable, self.samples = 0, []  # samples: the first unparseable answers, kept for the record
 
     def choose(self, state, instructions, options, name="next_tool"):
         prompt = (f"{instructions}\nState: {json.dumps(state)}\nOptions:\n"
                   + "\n".join(f"- {o}: {d}" for o, d in options.items())
-                  + "\nAnswer with exactly one option name and nothing else.")
+                  + ('\nAnswer with JSON only: {"choice": "<one option name>", "confidence": <0 to 1, how sure you are>}'
+                     if self.with_confidence else "\nAnswer with exactly one option name and nothing else."))
         t0 = time.perf_counter()
         try:
             res = Agent(model=self.llm, tools=[], callback_handler=None)(prompt)
@@ -142,13 +151,32 @@ class BedrockChooser(_OneHot):
         for k in self.tokens:
             self.tokens[k] += res.metrics.accumulated_usage.get(k, 0)
         text = str(res).strip()
+        if self.with_confidence:
+            return {**self._with_confidence(text, options), "client_latency_ms": ms, "model": BEDROCK_MODEL}
         named = [o for o in options if o in text]  # lenient: accept any answer that names exactly one option
         answer = text.strip("`'\". ") if text.strip("`'\". ") in options else named[0] if len(named) == 1 else None
         if answer is None:
-            self.unparseable += 1
-            self.samples.append(text[:200])
-            raise ValueError(f"unparseable Bedrock answer {text[:60]!r}")
+            self._unparseable(text)
         return {**self._answer(answer, options), "client_latency_ms": ms, "model": BEDROCK_MODEL}
+
+    def _unparseable(self, text: str):
+        self.unparseable += 1
+        self.samples.append(text[:200])
+        raise ValueError(f"unparseable Bedrock answer {text[:60]!r}")
+
+    def _with_confidence(self, text: str, options: dict) -> dict:
+        """Turns a stated confidence c into the distribution whose derived confidence is c, so the router's
+        threshold and read-only routing treat it exactly like a Decider answer."""
+        try:
+            ans = json.loads(text[text.index("{"):text.rindex("}") + 1])
+            choice, c, n = ans["choice"], float(ans["confidence"]), len(options)
+        except (ValueError, KeyError, TypeError):
+            self._unparseable(text)
+        if choice not in options or not 0 <= c <= 1:
+            self._unparseable(text)
+        top = (c * (n - 1) + 1) / n
+        return {"choice": choice, "confidence": c, "stated_confidence": c,
+                "probabilities": {o: top if o == choice else (1 - top) / (n - 1) for o in options}}
 
 
 def run_one(sid: str, family: str, chooser) -> dict:
@@ -173,14 +201,16 @@ def run_one(sid: str, family: str, chooser) -> dict:
     first = inc.trace[0]["decision"]
     escalated = inc.trace[-1]["tool"] == "defer_or_escalate"
     end = "restored" if inc.twin.service_restored() else "escalated" if escalated else "stuck"
+    evidence = EVIDENCE.get(family) in inc.twin.diagnostics if family in EVIDENCE else True
     unnecessary = inc.twin.profile_changes if family != "profile" else max(0, inc.twin.profile_changes - 1)
     o = inc.outcome()
     return {"incident": sid, "family": family,
             "first_choice": (first["raw"] or {}).get("choice"), "first_action": first["selected"],
             "first_choice_preferred": (first["raw"] or {}).get("choice") == preferred,
             "first_action_acceptable": first["selected"] in acceptable,
-            "end": end, "correct_end": end == terminal, "unnecessary_profile_changes": unnecessary,
-            "correct_without_collateral": end == terminal and unnecessary == 0,
+            "end": end, "evidence_collected": evidence, "correct_end": end == terminal and evidence,
+            "unnecessary_profile_changes": unnecessary,
+            "correct_without_collateral": end == terminal and evidence and unnecessary == 0,
             "steps": o["steps"], "simulated_minutes": o["simulated_minutes"],
             "forbidden_executions": o["forbidden_executions"], "chooser_ms": calls,
             "trace": [{"decision": t["decision"], "tool": t["tool"], "note": t.get("note")} for t in inc.trace]}
@@ -189,7 +219,10 @@ def run_one(sid: str, family: str, chooser) -> dict:
 def summarize(rows: list[dict]) -> dict:
     n = len(rows)
     ms = [m for r in rows for m in r["chooser_ms"]]
-    pct = lambda k: round(100 * sum(r[k] for r in rows) / n, 1)  # noqa: E731
+
+    def pct(k):
+        return round(100 * sum(r[k] for r in rows) / n, 1)
+
     q = statistics.quantiles(ms, n=20) if len(ms) > 1 else [0] * 19
     return {"incidents": n, "first_choice_preferred_pct": pct("first_choice_preferred"),
             "first_action_acceptable_pct": pct("first_action_acceptable"), "correct_end_pct": pct("correct_end"),
@@ -206,7 +239,7 @@ def summarize(rows: list[dict]) -> dict:
 
 def markdown(meta: dict, summaries: dict) -> str:
     rows = [("Incidents", "incidents"), ("First choice = preferred (%)", "first_choice_preferred_pct"),
-            ("First action acceptable (%)", "first_action_acceptable_pct"), ("Correct end state (%)", "correct_end_pct"),
+            ("First action acceptable (%)", "first_action_acceptable_pct"), ("Correct end state, with the evidence (%)", "correct_end_pct"),
             ("Correct, no unnecessary eSIM change (%)", "correct_without_collateral_pct"),
             ("Unnecessary profile changes", "unnecessary_profile_changes"),
             ("Forbidden executions (audited)", "forbidden_executions"), ("Mean steps", "mean_steps"),
@@ -220,17 +253,18 @@ def markdown(meta: dict, summaries: dict) -> str:
     out += [f"| {label} | " + " | ".join(str(summaries[c][k]) for c in cs) + " |" for label, k in rows]
     out += ["", "Correct end state by family (%):", "", "| Family | " + " | ".join(cs) + " |", "|---|" + "---:|" * len(cs)]
     out += [f"| {f} | " + " | ".join(str(summaries[c]["by_family_correct_end_pct"][f]) for c in cs) + " |" for f in FAMILIES]
-    if "bedrock" in meta:
-        out += ["", f"Bedrock ({BEDROCK_MODEL}): {meta['bedrock']['tokens']} tokens, "
-                    f"{meta['bedrock']['unparseable']} answers without exactly one option name or cut off at the "
-                    f"512-token output limit; each was routed to the fallback."]
+    for name in (c for c in cs if c.startswith("bedrock")):
+        b = meta[name]
+        out += ["", f"{name} ({b['model']}): {b['tokens']} tokens; {b['unparseable']} answers without a usable "
+                    f"option{' and confidence' if name != 'bedrock' else ''} or cut off at the {BEDROCK_MAX_TOKENS}-token "
+                    f"output limit, each routed to the fallback."]
     return "\n".join(out) + "\n"
 
 
 if __name__ == "__main__":
     ap = argparse.ArgumentParser()
     ap.add_argument("--per-family", type=int, default=10)
-    ap.add_argument("--choosers", default="rules,random,decider,bedrock")
+    ap.add_argument("--choosers", default="rules,random,decider,bedrock,bedrock+conf")
     ap.add_argument("--stamp", required=True, help="label for the result files, e.g. the date")
     ap.add_argument("--hardware", default="Decider: MLX on Apple M4 Max laptop; Bedrock: eu-central-1")
     ap.add_argument("--out-dir", default="docs/benchmark")
@@ -246,12 +280,13 @@ if __name__ == "__main__":
     results, summaries = {}, {}
     for name in a.choosers.split(","):
         chooser = {"rules": RulesChooser, "random": lambda: RandomChooser(7), "bedrock": BedrockChooser,
+                   "bedrock+conf": lambda: BedrockChooser(with_confidence=True),
                    "decider": lambda: DeciderClient(meta["decider_url"])}[name]()
         results[name] = [run_one(sid, fam, chooser) for sid, fam in incidents]
         summaries[name] = summarize(results[name])
-        if name == "bedrock":
-            meta["bedrock"] = {"model": BEDROCK_MODEL, "tokens": chooser.tokens, "unparseable": chooser.unparseable,
-                               "unparseable_samples": chooser.samples[:5]}
+        if name.startswith("bedrock"):
+            meta[name] = {"model": BEDROCK_MODEL, "tokens": chooser.tokens, "unparseable": chooser.unparseable,
+                          "unparseable_samples": chooser.samples[:5]}
         print(name, json.dumps(summaries[name]))
     os.makedirs(a.out_dir, exist_ok=True)
     base = os.path.join(a.out_dir, f"benchmark-{a.stamp}")

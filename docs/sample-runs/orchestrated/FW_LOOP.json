@@ -46,8 +46,8 @@
      },
      "confidence": 0.3859,
      "model": "strands-decider-2B-qwen3.5-v1-2610",
-     "latency_ms": 124.77,
-     "client_latency_ms": 148.8
+     "latency_ms": 123.25,
+     "client_latency_ms": 147.7
     },
     "selected": "investigate_device",
     "route": "gather_evidence",
@@ -122,8 +122,8 @@
      },
      "confidence": 0.2458,
      "model": "strands-decider-2B-qwen3.5-v1-2610",
-     "latency_ms": 125.07,
-     "client_latency_ms": 127.2
+     "latency_ms": 121.97,
+     "client_latency_ms": 126.4
     },
     "selected": "investigate_data_path",
     "route": "gather_evidence",
@@ -290,11 +290,13 @@
   }
  ],
  "mode": "orchestrated",
- "report": "**What happened** (simulated environment): 5,400 devices on US-NET-1 are dropping off repeatedly. Attach success was 0.41, data session 0.38, app ack 0.37, heartbeat 0.42, with flapping attach. A firmware change was rolled out before onset.\n\n**Decisions**\n- **Step 1:** Policy removed try_allowed_operator (profile permits no other operator) and evaluate_profile_change (needs reject-cause evidence). Chose retry_connection, confidence 0.39, routed to gather_evidence. Device diagnostics showed a modem reset loop (14.2 resets/day), no reject cause, uniform firmware.\n- **Step 2:** Policy also removed retry_connection (re-attach cannot fix a reset loop) and investigate_device (already done). Chose escalate_or_wait, confidence 0.25, routed to gather_evidence. Data-path diagnostics showed flapping PDN sessions, with APN and ingestion healthy.\n- **Step 3:** Only the fallback was admissible. defer_or_escalate ran and escalated the incident.\n\n**Outcome**\nRates after the last step were unchanged: attach 0.41, data 0.38, ack 0.37, heartbeat 0.42. Not restored. No profile change was made. The alternative profile stays uninstalled from use, since no reject cause was recorded to justify a switch.\n\n**Next**\n- Engineering should review the firmware rolled out before onset and consider rollback of the modem firmware.\n- Obtain registration reject-cause logs, which would be needed to evaluate a profile change.\n- Monitor the escalation.",
+ "report": "**What happened**\nThis is a simulated incident. 5,400 devices on US-NET-1 are dropping off repeatedly. Attach success was 0.41, data session 0.38, app ack 0.37, and heartbeat 0.42. Attach trend is flapping, and a firmware change was rolled out recently.\n\n**Decisions**\n- **Step 1:** Policy removed try_allowed_operator (no other operator permitted on profile_A) and evaluate_profile_change (needs a reject cause). The decider chose retry_connection (p=0.54, confidence 0.39). Route: gather_evidence. Tool: query_firmware_modem_diagnostics. Result: modem reset loop (14.2 resets/day) on uniform firmware, with no reject cause.\n- **Step 2:** Policy also removed retry_connection (re-attach cannot fix a reset loop) and investigate_device (already done). The decider chose escalate_or_wait (p=0.62, confidence 0.25). Route: gather_evidence. Tool: query_apn_session_app_diagnostics. Result: PDN sessions flapping, APN and ingestion healthy.\n- **Step 3:** Only the fallback was admissible. Route: fallback. Tool: defer_or_escalate. Escalated with the evidence above.\n\n**Outcome**\n- Rates after the final step are unchanged: attach 0.41, data session 0.38, app ack 0.37, heartbeat 0.42. Not restored.\n- No profile change was made. The profile switch was blocked because no reject cause was found, and no operator change was made.\n\n**Next**\n- The incident is escalated to a human engineer. Recommended: roll back or patch the modem firmware that was rolled out before onset, since the reset loop is the likely cause.\n- Obtain a registration reject cause before any profile change is considered.",
+ "report_after_fallback": false,
+ "bedrock_error": null,
  "bedrock_usage": {
   "inputTokens": 7511,
-  "outputTokens": 757,
-  "totalTokens": 8268
+  "outputTokens": 826,
+  "totalTokens": 8337
  },
  "advance_calls": 3,
  "decider_source": "live http://127.0.0.1:8099"

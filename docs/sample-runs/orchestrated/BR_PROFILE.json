@@ -45,8 +45,8 @@
      },
      "confidence": 0.0404,
      "model": "strands-decider-2B-qwen3.5-v1-2610",
-     "latency_ms": 123.47,
-     "client_latency_ms": 148.5
+     "latency_ms": 122.65,
+     "client_latency_ms": 143.8
     },
     "selected": "investigate_data_path",
     "route": "gather_evidence",
@@ -115,8 +115,8 @@
      },
      "confidence": 0.1993,
      "model": "strands-decider-2B-qwen3.5-v1-2610",
-     "latency_ms": 114.4,
-     "client_latency_ms": 117.4
+     "latency_ms": 105.78,
+     "client_latency_ms": 108.4
     },
     "selected": "investigate_device",
     "route": "gather_evidence",
@@ -195,8 +195,8 @@
      },
      "confidence": 0.8113,
      "model": "strands-decider-2B-qwen3.5-v1-2610",
-     "latency_ms": 148.35,
-     "client_latency_ms": 151.1
+     "latency_ms": 145.16,
+     "client_latency_ms": 147.9
     },
     "selected": "evaluate_profile_change",
     "route": "act",
@@ -209,18 +209,17 @@
     "target": "profile_B",
     "bedrock_plan": {
      "recommend_proceeding": true,
-     "rationale": "The evidence points to a serving-network problem rather than a device problem. Modem health is normal (0.1 resets/day), firmware is uniform with no recent change, and the device reports reject cause #17 from BR-NET-1. The alternative profile (profile_B, BR-NET-2) is already installed, so the switch is a local profile change with no download required. The management path is reachable, so the switch command can likely be delivered. Waiting leaves 3,200 devices at 4% attach and 0% application acknowledgement, so the status quo has a real cost. I recommend proceeding only as a staged canary with explicit verification gates and a tested rollback, not as a fleet-wide switch. Because the cohort is almost entirely offline, the switch command may reach only a small fraction of devices, so the canary result may not represent the full fleet.",
+     "rationale": "Proceeding is advisable only as a staged, gated pilot, not as a fleet-wide switch. The evidence points to a serving-operator problem rather than a device problem: modem health is normal (0.1 resets/day), firmware is uniform with no recent change, and the device reports reject cause #17 from BR-NET-1. Current service is effectively down for the cohort (4% attach, 3% data sessions, 0% app ack across 3,200 devices), and retries have not helped. profile_B (BR-NET-2) is already installed, so switching requires no new provisioning, and the management path is reachable, which gives a control channel to observe and recover. Staying on profile_A has no realistic recovery path while BR-NET-1 keeps rejecting attaches. The switch is still unverified, though: profile_B is disabled and has never been exercised on these devices, so a fleet-wide cutover without a canary would risk turning a partial outage into a total one.",
      "risks": [
-      "Canary-first is required: switch a small subset (for example 1-2%) and verify attach, PDN session, and application ack before expanding. Define go/no-go thresholds in advance.",
-      "Reject cause #17 may be transient or cell-specific. A fleet-wide switch could be made unnecessarily if BR-NET-1 recovers, and the recovery window is unknown.",
-      "BR-NET-2 coverage may not match the deployment geography. Some devices may have no service on profile_B, leaving them stranded on a non-working profile.",
-      "Profile_B is currently disabled, and the policy flag shows other operators are not allowed on the active profile. Confirm that switching is authorized under the contract, the regulatory rules (Anatel), and the roaming or MVNO agreements before acting.",
-      "Management reachability is currently measured against a heartbeat rate of 4%. Switch commands may be delivered inconsistently, leaving the fleet split across profiles. Track per-device profile state and reconcile it after the operation.",
-      "Rollback risk: if profile_B fails to attach and the device cannot be reverted to profile_A, devices could be stranded with no connectivity. Verify that profile_A re-enable works on a canary device before the rollout.",
-      "Application acknowledgement is at 0%, so verification of application-level health after attach is blind. Attach and PDN success alone may not confirm the workload is functional.",
-      "Retries are already exhausted (3 attempts). Use a backoff and a bounded retry policy so the switch does not generate signaling storms against BR-NET-2 or the management backend.",
-      "Switching many devices at once could cause a simultaneous attach surge on BR-NET-2, which may trigger its own rejects or rate limits.",
-      "Cause #17 is ambiguous as a root cause. Without an operator-side status confirmation, the diagnosis rests on device-side inference alone."
+      "profile_B (BR-NET-2) has not been validated on these devices. Attach, APN, IP allocation, roaming and data-plan settings may differ from profile_A and could fail even though the modem is healthy.",
+      "The management path may depend on BR-NET-1 or on the active profile. If profile_A is disabled before profile_B attaches, devices could become unreachable, and recovery would then require physical or out-of-band access.",
+      "The reject cause #17 may reflect a regional or national outage or a shared-infrastructure problem in Brazil rather than an operator-specific fault. BR-NET-2 could fail the same way, so the switch would not fix the incident.",
+      "Profile switching is not atomic on every eSIM implementation. A failed or interrupted switch could leave devices with no enabled profile, which is a bricking-style failure across 3,200 units.",
+      "Rollback is limited. profile_A is only useful again if BR-NET-1 recovers, so a failed switch may leave devices with no working profile until the operator fixes its side.",
+      "Policy and contract risk: other_operator_allowed_on_active_profile is false, so moving to BR-NET-2 may breach the configured profile policy, a commercial agreement, or a regulatory or data-residency requirement. This needs explicit approval outside this review.",
+      "Billing and roaming side effects: BR-NET-2 may bill differently, may be roaming for some devices, or may lack data coverage at certain sites, which could create cost or coverage gaps.",
+      "Staged rollout risk: changing all 3,200 devices at once removes the ability to detect failure early. Abort thresholds, a canary cohort and a per-batch success gate are needed before expansion.",
+      "Signal and state caveat: the observed rates come from a single snapshot. Telemetry may lag or be incomplete, so the canary result should be read against fresh data, not this state alone."
      ]
     },
     "executed": true,
@@ -338,11 +337,13 @@
   }
  ],
  "mode": "orchestrated",
- "report": "**What happened:** (Simulated environment.) 3,200 devices in BR had attach success at 4% and app acknowledgement at 0%. The active profile (profile_A) was on serving operator BR-NET-1, and the alternative profile_B (BR-NET-2) was already installed.\n\n**Decisions:**\n- **Step 1:** Policy removed try_allowed_operator and evaluate_profile_change. Choice: retry_connection, confidence 0.04, routed as gather_evidence. Tool: query_apn_session_app_diagnostics. Result: no PDN sessions, attach failing on BR-NET-1.\n- **Step 2:** Policy removed the same options plus investigate_data_path. Choice: retry_connection, confidence 0.20, routed as gather_evidence. Tool: query_firmware_modem_diagnostics. Result: modem healthy, reject cause #17 from BR-NET-1.\n- **Step 3:** Policy removed try_allowed_operator, investigate_device and investigate_data_path. Choice: evaluate_profile_change, confidence 0.81, routed as act. Tool: prepare_guarded_profile_transition to profile_B. All gates passed, including human approval. eIM enable succeeded.\n\n**Outcome:** Restored. Rates after the last step: attach 0.997, data session 0.99, app ack 0.995, heartbeat 0.99. The profile changed from profile_A to profile_B (BR-NET-2), approved by a human, per the gate record.\n\n**Next:**\n- The planner recommended a staged canary with rollback checks. The tool output doesn't show whether the switch was canaried or fleet-wide, so confirm the rollout scope.\n- Confirm the switch is authorized under the contract and Anatel/roaming terms.\n- Reconcile per-device profile state, since management delivery was unreliable at 4% heartbeat.\n- Watch BR-NET-1 for recovery and document the cause #17 root cause.",
+ "report": "**SIMShift report (simulated environment, no real devices)**\n\n**What happened:** Persistent attach failures on 3,200 BR devices, serving operator BR-NET-1. Starting rates: attach 0.04, data session 0.03, app ack 0.0, heartbeat 0.04. Retries had not helped.\n\n**Decisions:**\n- **Step 1:** Policy removed try-allowed-operator (no other operator permitted on profile_A) and evaluate-profile-change (no reject-cause evidence yet). Choice: retry_connection, confidence 0.04, routed to gather_evidence. Ran data-path diagnostics: no PDN sessions.\n- **Step 2:** Policy removed try-allowed-operator, evaluate-profile-change, and investigate-data-path (evidence already collected). Choice: retry_connection, confidence 0.20, routed to gather_evidence. Ran device diagnostics: modem healthy, firmware uniform, reject cause #17 from BR-NET-1.\n- **Step 3:** Policy removed try-allowed-operator and investigate steps. Choice: evaluate_profile_change, confidence 0.81, routed to act. Switched profile_A to profile_B (BR-NET-2). Gate checks all passed, including human approval.\n\n**Outcome:** Rates after the last step: attach 0.997, data session 0.99, app ack 0.995, heartbeat 0.99. Marked restored. Profile changed from profile_A to profile_B, which breaches the configured \"no other operator\" policy. The gate recorded owner authorization and human approval.\n\n**Concerns:**\n- The planning advice recommended a staged canary, but the log shows one fleet-wide enable with no canary stage.\n- Rates come from a single post-switch snapshot.\n\n**Next:**\n- Confirm the approval covers the policy exception and the commercial/regulatory implications for BR-NET-2.\n- Verify per-device status and billing or roaming effects.\n- Investigate BR-NET-1 reject cause #17.\n- Review why the canary step was skipped.",
+ "report_after_fallback": false,
+ "bedrock_error": null,
  "bedrock_usage": {
-  "inputTokens": 8689,
-  "outputTokens": 1081,
-  "totalTokens": 9770
+  "inputTokens": 8663,
+  "outputTokens": 1114,
+  "totalTokens": 9777
  },
  "advance_calls": 3,
  "decider_source": "live http://127.0.0.1:8099"

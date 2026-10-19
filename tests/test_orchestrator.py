@@ -88,3 +88,32 @@ def test_no_hidden_truth_reaches_bedrock():
         for secret in (sc["hidden"]["cause"], sid, "best_actions", '"networks"', "ingestion_healthy",
                        "device_powered", '"hidden"', "firmware_fault", "transient_congestion"):
             assert secret not in sent, (sid, secret)
+
+
+def test_report_is_rewritten_after_a_deterministic_finish():
+    model = ScriptedModel([("text", "STALE"), ("text", "FINAL REPORT")])
+    r = orchestrate("OFFLINE", model=model, decider=ScriptedDecider(["investigate_data_path"]))
+    assert r["advance_calls"] == 0 and r["report_after_fallback"] and r["report"] == "FINAL REPORT"
+    assert "ran deterministically" in model.seen[-1]
+
+
+def test_bedrock_failure_still_finishes_the_incident():
+    class Broken(ScriptedModel):
+        async def stream(self, *a, **k):
+            raise RuntimeError("throttled")
+            yield  # never reached; makes this an async generator like the real stream()
+    r = orchestrate("OFFLINE", model=Broken([]), decider=ScriptedDecider(["investigate_data_path"]))
+    assert r["report"] is None and "throttled" in r["bedrock_error"]
+    assert r["trace"][-1]["tool"] == "defer_or_escalate"
+
+
+def test_tool_budget_stops_a_runaway_model():
+    model = ScriptedModel([("tool", "get_incident_state", {})] * 100)
+    r = orchestrate("OFFLINE", model=model, decider=ScriptedDecider(["investigate_data_path"]))
+    assert model.i <= 20 and r["trace"][-1]["tool"] == "defer_or_escalate"
+
+
+def test_advance_calls_counts_every_call():
+    model = ScriptedModel([ADVANCE, ADVANCE, ("text", "REPORT")])
+    r = orchestrate("OFFLINE", model=model, decider=ScriptedDecider(["investigate_data_path"]))
+    assert r["advance_calls"] == len(r["trace"]) == 2

@@ -182,3 +182,49 @@ def test_deferred_approval():
         last = inc.resolve_approval(approve)
         assert inc.done and inc.pending_approval is None and pid in last["note"]
         assert inc.twin.service_restored() == approve and problems(inc.result()) == []
+
+
+def _br_variant(monkeypatch, **changes):
+    import copy
+
+    from simshift.simulator import SCENARIOS
+    sc = copy.deepcopy(SCENARIOS["BR_PROFILE"])
+    for path, value in changes.items():
+        *keys, last = path.split(".")
+        d = sc
+        for k in keys:
+            d = d[k]
+        d[last] = value
+    monkeypatch.setitem(SCENARIOS, "BR_VARIANT", sc)
+    return "BR_VARIANT"
+
+
+@pytest.mark.parametrize("changes, end", [
+    ({"networks.BR-NET-2": "down"}, "ROLLED_BACK"),  # verification fails, rollback works
+    ({"networks.BR-NET-2": "down", "euicc.rollback_supported": False}, "ROLLBACK_FAILED"),
+    ({"owner_allows_profile_switch": False}, "BLOCKED"),  # a gate check the policy filter does not mirror
+])
+def test_failed_profile_change_escalates(monkeypatch, changes, end):
+    sid = _br_variant(monkeypatch, **changes)
+    r = run(sid, approve=True, decider=ScriptedDecider(["investigate_device", "evaluate_profile_change"]),
+            use_bedrock=False)
+    change = next(t for t in r["trace"] if t["tool"] == TOOLS["evaluate_profile_change"])
+    assert change["tool_result"]["transition"][-1] == end
+    assert r["trace"][-1]["tool"] == TOOLS["escalate_or_wait"] and end in r["trace"][-1]["note"]
+    assert any(e["kind"] == "escalated" for e in r["events"])
+    if end == "ROLLBACK_FAILED":
+        assert r["outcome"]["active_profile"] == "profile_B" and not r["outcome"]["restored"]
+
+
+def test_bedrock_review_failure_still_reaches_the_gate(monkeypatch):
+    import simshift.agent as ag
+
+    def broken(llm, prompt, schema=None):
+        raise RuntimeError("throttled")
+    monkeypatch.setattr(ag, "_bedrock", broken)
+    inc = ag.Incident("BR_PROFILE", decider=ScriptedDecider(["investigate_device", "evaluate_profile_change"]))
+    while not inc.done:
+        inc.step()
+    assert inc.pending_approval and "throttled" in inc.trace[-1]["tool_result"]["bedrock_plan"]["error"]
+    inc.resolve_approval(True)
+    assert inc.twin.service_restored()
