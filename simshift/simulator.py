@@ -291,6 +291,14 @@ class FleetTwin:
         idempotency key, so a repeated command returns the first result."""
         if approval in self.commands:
             return self.commands[approval]
+        if not isinstance(target, str):
+            raise TypeError("target must be a string")
+        if target not in self.s["profiles"]:
+            return self._log("eim_enable_profile", ok=False,
+                             reason="target profile is not installed; command not sent")
+        if target == self.s["active_profile"]:
+            return self._log("eim_enable_profile", ok=False,
+                             reason="target profile is already active; command not sent")
         if approval != self.proposal_id(target):  # not cached: a later approved attempt must really execute
             return self._log("eim_enable_profile", ok=False, reason="no operator approval for this proposal; command not sent")
         if not (self.s["euicc"]["supports_profile_enable"] and self.s["owner_allows_profile_switch"]):

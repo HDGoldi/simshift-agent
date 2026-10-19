@@ -115,7 +115,7 @@ Decider ran on a laptop GPU and Bedrock in eu-central-1, and each chooser ran on
 ```bash
 git clone https://github.com/HDGoldi/simshift-agent && cd simshift-agent
 make install                     # or: uv venv && uv pip install -e . pytest
-make test                        # 138 tests + trace validation; no Decider server or AWS needed
+make test                        # 147 tests + trace validation; no Decider server or AWS needed
 make ui                          # Recovery Decision Inspector on recorded real Decider answers: http://127.0.0.1:8090
 make replay                      # re-run all six recorded traces against the current code
 ```
@@ -153,8 +153,8 @@ twin, and Bedrock's plan review and explanation.
 
 ## Tests
 
-`make test` runs 138 tests and validates every published trace and the benchmark file. Without AWS credentials and a
-Decider server, 137 pass and the real-Decider test skips (set `SIMSHIFT_REQUIRE_DECIDER=1` to make that a failure).
+`make test` runs 147 tests and validates every published trace and the benchmark file. Without AWS credentials and a
+Decider server, 146 pass and the real-Decider test skips (set `SIMSHIFT_REQUIRE_DECIDER=1` to make that a failure).
 Bedrock is never called in tests. The acceptance properties covered:
 - Decider's choice controls which Strands tool runs; Bedrock in orchestrator mode cannot change it.
 - Excluded options are never offered and are denied on any call path; an independent audit counts violations.
