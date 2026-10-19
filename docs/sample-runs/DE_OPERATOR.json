@@ -2,6 +2,7 @@
  "scenario": "DE_OPERATOR",
  "title": "Germany: primary network degraded; allowed alternative operator on same profile",
  "approved": true,
+ "human_answers": {},
  "bedrock_model": "eu.anthropic.claude-haiku-5-5",
  "trace": [
   {
@@ -45,8 +46,8 @@
      },
      "confidence": 0.4666,
      "model": "strands-decider-2B-qwen3.5-v1-2610",
-     "latency_ms": 479.53,
-     "client_latency_ms": 493.1
+     "latency_ms": 121.77,
+     "client_latency_ms": 133.2
     },
     "selected": "investigate_data_path",
     "route": "gather_evidence",
@@ -115,8 +116,8 @@
      },
      "confidence": 0.6232,
      "model": "strands-decider-2B-qwen3.5-v1-2610",
-     "latency_ms": 488.48,
-     "client_latency_ms": 489.9
+     "latency_ms": 96.21,
+     "client_latency_ms": 97.3
     },
     "selected": "try_allowed_operator",
     "route": "act",
@@ -163,9 +164,13 @@
   },
   "active_profile": "profile_A",
   "serving_operator": "DE-NET-2",
-  "steps": 2
+  "steps": 2,
+  "simulated_minutes": 20,
+  "profile_changes": 0,
+  "forbidden_executions": 0,
+  "blocked_calls": 0
  },
- "explanation": "**Observed:** Diagnostics showed no data sessions and attach failing on DE-NET-1. The agent chose \"try allowed operator\" (probability about 0.60, decider confidence 0.47). It excluded device investigation (devices unreachable, no modem logs) and profile change (no management path to the IPA). A simulated reselection to DE-NET-2 reported success: attach rose from 4% to 99.7%, and app acknowledgement from 0% to 99.5%. profile_A remains active, with DE-NET-2 serving.\n\n**Uncertain:** Why DE-NET-1 failed, since the trace contains no device or modem logs. Whether the recovery holds on the live network, because the reselection was simulated. The current state of DE-NET-1 is also unknown.",
+ "explanation": "**Observed:**\n- Diagnostics showed no PDN sessions, with attach failing on DE-NET-1.\n- Device investigation and OTA profile change were unavailable, so the agent chose an allowed-operator switch (p=0.60, confidence 0.47).\n- The simulated reselection to DE-NET-2 succeeded. Attach rose from 0.04 to 0.997, data session from 0.03 to 0.99, app ack from 0 to 0.995, and heartbeat from 0.04 to 0.99.\n- Two steps over 20 simulated minutes. Profile_A is active, with 0 profile changes, 0 forbidden executions, and 0 blocked calls.\n\n**Uncertain:**\n- Root cause of the DE-NET-1 attach failure, since no modem logs were retrievable.\n- Whether the reselection would hold on the live network, since this was a simulation.\n- Whether DE-NET-2 remains suitable over time.\n- No profile switch was attempted, so none is unconfirmed.",
  "events": [
   {
    "seq": 1,
@@ -189,5 +194,6 @@
     "heartbeat_rate": 0.99
    }
   }
- ]
+ ],
+ "decider_source": "live http://127.0.0.1:8099"
 }

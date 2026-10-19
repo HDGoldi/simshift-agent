@@ -1,7 +1,8 @@
 import pytest
 import json
 
-from simshift.policy import counterfactual, exclusions, guarded_profile_transition, proposal_id
+from simshift.policy import (counterfactual, exclusions, guarded_profile_transition, profile_transition_gate,
+                             proposal_id)
 from simshift.simulator import SCENARIOS, FleetTwin
 
 
@@ -149,7 +150,7 @@ def test_transition_timeline():
     assert ok.index("VERIFYING") < ok.index("SUCCEEDED") == len(ok) - 1
     off = FleetTwin("OFFLINE")
     blocked = guarded_profile_transition(off, "profile_B", proposal_id(off, "profile_B"))["transition"]
-    assert blocked == ["REQUESTED", "BLOCKED"] and "SENT" not in blocked
+    assert blocked == ["REQUESTED", "BLOCKED"] and "DELIVERED" not in blocked
 
 
 def test_counterfactual_cannot_force_ota_on_offline():
@@ -184,12 +185,94 @@ def test_transient_clears_on_retry_only():
     assert twin.service_restored() and twin.s["active_profile"] == "profile_A"
 
 
-def test_rollback_needs_the_same_management_path_as_enable():
+def test_lost_path_after_a_switch_rolls_back_on_the_device():  # audit T10, TEL-014
     twin = FleetTwin("TRANSIENT")  # management rides on cellular
     twin.s["networks"]["FR-NET-2"] = "down"
-    assert twin.enable_profile("profile_B", twin.proposal_id("profile_B"))["ok"]  # direct eIM call, still registered
-    assert not twin.management_reachable()  # profile_B cannot register, so the cellular path is gone
-    assert not twin.rollback_profile("profile_A", "FR-NET-1")["ok"]
+    ev = twin.enable_profile("profile_B", twin.proposal_id("profile_B"))  # direct eIM call, still registered
+    assert ev["ok"] and not ev["result_reported"] and ev["rollback_authorized"]  # profile_B cannot report back
+    assert twin.events[-1]["kind"] == "ipa_local_rollback" and twin.s["active_profile"] == "profile_A"
+    assert not any(e["kind"] == "eim_rollback" for e in twin.events)  # the device did it, not an eIM command
+
+
+def _br_switch(**changes):
+    twin = FleetTwin("BR_PROFILE")
+    for path, value in changes.items():
+        *keys, last = path.split(".")
+        d = twin.s
+        for k in keys:
+            d = d[k]
+        d[last] = value
+    twin.firmware_modem_diagnostics()
+    return twin, guarded_profile_transition(twin, "profile_B", proposal_id(twin, "profile_B"))
+
+
+def test_missing_result_is_never_read_as_success():  # audit T10, TEL-016
+    twin, out = _br_switch(management_drops_on_switch=True)  # gateway lost mid-change; profile_B registers
+    assert out["transition"][-3:] == ["RESULT_PENDING", "VERIFYING", "SUCCEEDED"]  # network sees profile_B's operator
+    assert out["profile_state_evidence"]
+    twin, out = _br_switch(management_drops_on_switch=True, **{"networks.BR-NET-2": "down"})
+    assert out["transition"][-3:] == ["RESULT_PENDING", "VERIFYING", "UNCONFIRMED"] and "rollback" not in out
+    kinds = [e["kind"] for e in twin.events]
+    assert "ipa_local_rollback" in kinds and "eim_rollback" not in kinds  # no second command on a dead path
+
+
+def test_reject_cause_stops_retries():  # audit T25, TEL-021
+    twin = FleetTwin("BR_PROFILE")
+    assert "retry_connection" not in exclusions(twin.observe())
+    twin.firmware_modem_diagnostics()
+    assert "network back-off" in exclusions(twin.observe())["retry_connection"]
+
+
+def test_no_retry_for_devices_that_are_not_trying_to_attach():  # audit T18, TEL-028
+    twin = FleetTwin("OFFLINE")
+    assert "retry_connection" not in exclusions(twin.observe())
+    d = twin.data_path_diagnostics()["result"]
+    assert "PSM" in d["summary"] and "not trying to attach" in exclusions(twin.observe())["retry_connection"]
+
+
+def test_reselection_stays_on_the_active_profile_list():  # audit T01/T02, TEL-001/002
+    twin = FleetTwin("DE_OPERATOR")  # DE-NET-3 is in coverage but only on profile_B
+    ev = twin.operator_reselection()
+    assert ev["to_operator"] == "DE-NET-2" and twin.s["active_profile"] == "profile_A"
+    twin = FleetTwin("DE_OPERATOR")
+    twin.s["operators_in_coverage"].remove("DE-NET-2")
+    assert "try_allowed_operator" in exclusions(twin.observe())  # a visible operator is not a permitted one
+
+
+def test_no_alternate_profile_means_no_profile_change():  # audit T11
+    twin = FleetTwin("BR_PROFILE")
+    del twin.s["profiles"]["profile_B"]
+    twin.firmware_modem_diagnostics()
+    assert exclusions(twin.observe())["evaluate_profile_change"] == "no alternate profile installed"
+
+
+def test_brazil_needs_a_path_that_does_not_ride_on_profile_a():  # audit P0 Brazil, TEL-022
+    twin, out = _br_switch(**{"management.via_cellular": True})
+    assert "evaluate_profile_change" in exclusions(twin.observe())
+    assert not out["executed"] and "management_path_reachable" in out["gate"]["failed"]
+
+
+def test_registered_without_a_data_session_is_not_restored(monkeypatch):  # audit T05, invariant 12
+    twin = FleetTwin("JP_INGEST")
+    monkeypatch.setattr(FleetTwin, "rates", lambda self: {"attach_success_rate": 0.997, "data_session_rate": 0.1,
+                                                          "app_ack_rate": 0.995, "heartbeat_rate": 0.99})
+    assert not twin.service_restored()
+
+
+def test_firmware_cohort_is_not_offered_a_profile_change_first():  # audit T26, TEL-024
+    twin = FleetTwin("FW_LOOP")
+    assert "evaluate_profile_change" in exclusions(twin.observe())
+    assert twin.firmware_modem_diagnostics()["result"]["same_cells_other_firmware"] == "stable"
+
+
+def test_approval_for_a_stale_from_profile_is_refused():  # audit T27
+    twin = FleetTwin("BR_PROFILE")
+    twin.firmware_modem_diagnostics()
+    stale = proposal_id(twin, "profile_B")  # issued while profile_A is active
+    twin.s["active_profile"] = "profile_B"  # the device state moved on
+    assert stale != proposal_id(twin, "profile_A")
+    assert not profile_transition_gate(twin, "profile_A", stale)["checks"]["human_approval"]
+    assert not twin.enable_profile("profile_A", stale)["ok"]
 
 
 def test_eim_still_refuses_if_the_gate_were_broken(monkeypatch):
@@ -212,3 +295,28 @@ def test_eim_enforces_capability_and_owner_even_on_a_direct_call(field):
         twin.s[field] = False
     res = twin.enable_profile("profile_B", twin.proposal_id("profile_B"))  # bypasses the gate entirely
     assert not res["ok"] and twin.s["active_profile"] == "profile_A"
+
+
+def test_restored_service_alone_does_not_confirm_a_missing_result(monkeypatch):  # adversarial review: TEL-016
+    monkeypatch.setattr(FleetTwin, "service_restored", lambda self: True)  # telemetry looks fine either way
+    twin = FleetTwin("BR_PROFILE")
+    twin.s["management_drops_on_switch"] = True
+    twin.s["profiles"]["profile_B"]["operators"] = ["BR-NET-3"]  # target operator never registers anywhere
+    twin.s["operators_in_coverage"].append("BR-NET-3")
+    twin.firmware_modem_diagnostics()
+    out = guarded_profile_transition(twin, "profile_B", proposal_id(twin, "profile_B"))
+    assert out["transition"][-1] == "UNCONFIRMED" and out["profile_state_evidence"] is None
+
+
+def test_a_shared_operator_does_not_identify_the_target_profile(monkeypatch):  # Codex review pass 2
+    from simshift import policy
+    real = policy.profile_transition_gate  # the gate blocks this setup (reselection is available), so bypass it
+    monkeypatch.setattr(policy, "profile_transition_gate",
+                        lambda t, target, a: {**real(t, target, a), "allowed": True, "failed": []})
+    twin = FleetTwin("BR_PROFILE")
+    twin.s["management_drops_on_switch"] = True
+    twin.s["profiles"]["profile_A"]["operators"] = ["BR-NET-1", "BR-NET-2"]  # both profiles reach BR-NET-2
+    twin.firmware_modem_diagnostics()
+    out = guarded_profile_transition(twin, "profile_B", proposal_id(twin, "profile_B"))
+    assert twin.service_restored() and out["transition"][-1] == "UNCONFIRMED"  # service back, profile still unknown
+    assert policy.only_on(twin.s["profiles"], "profile_B", "profile_A", "BR-NET-2") is False

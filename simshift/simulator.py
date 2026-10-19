@@ -141,7 +141,7 @@ SCENARIOS: dict[str, dict] = {
 
 # Simulated minutes each twin action takes while the incident is open (the agent only acts while it is open).
 COST_MIN = {"retry": 5, "operator_reselection": 10, "diagnostics_device": 15, "diagnostics_data_path": 10,
-            "eim_enable_profile": 30, "eim_rollback": 20, "escalated": 60}
+            "eim_enable_profile": 30, "eim_rollback": 20, "ipa_local_rollback": 20, "escalated": 60}
 
 
 class FleetTwin:
@@ -186,7 +186,7 @@ class FleetTwin:
 
     def service_restored(self) -> bool:
         r = self.rates()
-        return r["attach_success_rate"] >= RESTORED_THRESHOLD and r["app_ack_rate"] >= RESTORED_THRESHOLD
+        return all(r[k] >= RESTORED_THRESHOLD for k in ("attach_success_rate", "data_session_rate", "app_ack_rate"))
 
     def observe(self) -> dict:
         """Observable state only. Never includes hidden cause, network health, or ingestion health."""
@@ -239,7 +239,9 @@ class FleetTwin:
             reg = self._registered()
             if self.s.get("firmware_fault"):
                 d = {"available": True, "firmware_uniform": True, "modem_resets_per_day": 14.2, "reject_cause": None,
-                     "summary": "modem reset loop on the firmware rolled out before onset; registration accepted between resets"}
+                     "same_cells_other_firmware": "stable",
+                     "summary": "modem reset loop on the firmware rolled out before onset; registration accepted between "
+                                "resets; devices on older firmware in the same cells are stable"}
                 self.diagnostics["device"] = d
                 return self._log("diagnostics_device", result=d)
             d = {"available": True, "firmware_uniform": True, "modem_resets_per_day": 0.1,
@@ -253,7 +255,9 @@ class FleetTwin:
         s = self.s
         if not s.get("device_powered", True):
             d = {"network_side_attach_attempts_last_6h": 0,
-                 "summary": "no attach attempts seen by any network; last known cells normal (power/field issue suspected)"}
+                 "summary": "no attach attempts seen by any network and no periodic registration updates since the last "
+                            "heartbeat (a PSM device still sends them when its periodic timer expires); last known cells "
+                            "normal (power/field issue suspected)"}
         elif self._registered() and not s["ingestion_healthy"]:
             d = {"pdn_sessions": "established", "apn": "ok", "ingest_http_5xx_rate": 0.98,
                  "summary": "cellular + APN healthy; ingestion endpoint rejecting payloads since deploy ingest-v2.14"}
@@ -296,15 +300,25 @@ class FleetTwin:
         if not self.management_reachable():
             res = self._log("eim_enable_profile", ok=False, reason="IPA unreachable; command not delivered")
         else:
-            prev = s["active_profile"]
+            prev, prev_operator = s["active_profile"], s["serving_operator"]
             s["active_profile"] = target
             ops = [o for o in s["profiles"][target]["operators"] if o in s["operators_in_coverage"]]
             if ops:
                 s["serving_operator"] = ops[0]
             self.profile_changes += 1
+            if s.get("management_drops_on_switch"):  # test-only: the gateway goes offline during the change
+                s["management"]["up"] = False
+            rollback_authorized = s["euicc"]["rollback_supported"]  # stands in for the rollback flag on the enable
+            # The eUICC result reaches the eIM only over a management path that still works after the switch.
+            reported = self.management_reachable()
             res = self._log("eim_enable_profile", ok=True, from_profile=prev, to_profile=target,
-                            ipa_ack=True, serving_operator=s["serving_operator"],
-                            restored=self.service_restored(), rates=self.rates())
+                            result_reported=reported, rollback_authorized=rollback_authorized,
+                            serving_operator=s["serving_operator"], restored=self.service_restored(), rates=self.rates())
+            if rollback_authorized and not reported and not self._registered():
+                # No connectivity on the new profile and no way to report: the IPA rolls back on the device. No eIM
+                # command is involved, and the eIM is not told; it only sees a missing result.
+                s["active_profile"], s["serving_operator"] = prev, prev_operator
+                self._log("ipa_local_rollback", from_profile=target, to_profile=prev, rates=self.rates())
         self.commands[approval] = res
         return res
 
@@ -315,6 +329,8 @@ class FleetTwin:
         return sum(COST_MIN.get(e["kind"], 0) for e in self.events)
 
     def rollback_profile(self, previous: str, previous_operator: str) -> dict:
+        """The eIM re-enables the previous profile over the management path, covered by the original approval. The
+        device-side rollback for a lost management path is in enable_profile."""
         if not self.s["euicc"]["rollback_supported"]:
             return self._log("eim_rollback", ok=False, reason="rollback not supported")
         if not self.management_reachable():  # same path rule as enable: a cellular path needs a registered profile

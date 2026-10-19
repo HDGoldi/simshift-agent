@@ -28,6 +28,12 @@ def exclusions(obs: dict) -> dict[str, str]:
         out["retry_connection"] = "registration already healthy; re-attaching cannot help"
     elif obs["diagnostics"].get("device", {}).get("modem_resets_per_day", 0) > MAX_RESETS_PER_DAY:
         out["retry_connection"] = "modem reset loop on the devices; re-attaching cannot help"
+    elif obs["diagnostics"].get("device", {}).get("reject_cause"):
+        out["retry_connection"] = ("serving network rejects registration (reject cause seen); a re-attach on the same"
+                                   " operator meets the same reject and network back-off")
+    elif obs["diagnostics"].get("data_path", {}).get("network_side_attach_attempts_last_6h") == 0:
+        out["retry_connection"] = ("no attach attempts seen by any network; a network-side re-attach cannot reach"
+                                   " devices that are not trying to attach")
     if not obs["other_operator_allowed_on_active_profile"]:
         out["try_allowed_operator"] = "active profile permits no other operator in coverage"
     if not obs["management_path_reachable"]:
@@ -48,15 +54,25 @@ def exclusions(obs: dict) -> dict[str, str]:
     return out
 
 
-# Allowed eUICC transition paths. Verification always precedes SUCCEEDED; a blocked request is never SENT.
+# Allowed profile-switch paths: SIMShift workflow states, loosely following SGP.32 milestones (package delivered to
+# the IPA, eUICC result reported to the eIM). Verification always precedes SUCCEEDED; a blocked request is never
+# DELIVERED; a missing result is never read as success, and no second command follows it.
+_DELIVERED = ("REQUESTED", "VALIDATED", "APPROVED", "DELIVERED")
 TRANSITION_PATHS = {
     ("REQUESTED", "BLOCKED"),
     ("REQUESTED", "VALIDATED", "AWAITING_APPROVAL"),  # every check passed except the human approval
     ("REQUESTED", "VALIDATED", "APPROVED", "NOT_DELIVERED"),
-    ("REQUESTED", "VALIDATED", "APPROVED", "SENT", "ACK", "ENABLED", "VERIFYING", "SUCCEEDED"),
-    ("REQUESTED", "VALIDATED", "APPROVED", "SENT", "ACK", "ENABLED", "VERIFYING", "FAILED", "ROLLED_BACK"),
-    ("REQUESTED", "VALIDATED", "APPROVED", "SENT", "ACK", "ENABLED", "VERIFYING", "FAILED", "ROLLBACK_FAILED"),
+    _DELIVERED + ("RESULT_REPORTED", "VERIFYING", "SUCCEEDED"),
+    _DELIVERED + ("RESULT_REPORTED", "VERIFYING", "FAILED", "ROLLED_BACK"),
+    _DELIVERED + ("RESULT_REPORTED", "VERIFYING", "FAILED", "ROLLBACK_FAILED"),
+    _DELIVERED + ("RESULT_PENDING", "VERIFYING", "SUCCEEDED"),  # network registration on the target + telemetry
+    _DELIVERED + ("RESULT_PENDING", "VERIFYING", "UNCONFIRMED"),  # state unknown to the eIM: a human reconciles
 }
+
+
+def only_on(profiles: dict, target: str, previous: str, operator: str) -> bool:
+    """True if `operator` can only be reached through `target`, so registration on it identifies that profile."""
+    return operator in profiles[target]["operators"] and operator not in profiles[previous]["operators"]
 
 
 def proposal_id(twin: FleetTwin, target: str) -> str:
@@ -97,9 +113,16 @@ def guarded_profile_transition(twin: FleetTwin, target: str, approval: str | Non
     result = twin.enable_profile(target, approval)  # the eIM checks the approval itself, so a broken gate cannot skip it
     if not result.get("ok"):
         return _done({"executed": False, "gate": gate, "eim": result}, ["REQUESTED", "VALIDATED", "APPROVED", "NOT_DELIVERED"])
-    states = ["REQUESTED", "VALIDATED", "APPROVED", "SENT", "ACK", "ENABLED", "VERIFYING"]
     verified = twin.service_restored()
     out = {"executed": True, "gate": gate, "eim": result, "verified_restored": verified}
+    if not result.get("result_reported"):
+        # Without the eUICC result, success needs independent evidence of the profile state: the network sees the
+        # devices registered on an operator that the target profile allows and the previous one does not.
+        on_target = only_on(twin.s["profiles"], target, result["from_profile"], twin.s["serving_operator"])
+        out["profile_state_evidence"] = "network registration on the target profile's operator" if on_target else None
+        return _done(out, list(_DELIVERED) + ["RESULT_PENDING", "VERIFYING",
+                                              "SUCCEEDED" if verified and on_target else "UNCONFIRMED"])
+    states = list(_DELIVERED) + ["RESULT_REPORTED", "VERIFYING"]
     if verified:
         return _done(out, states + ["SUCCEEDED"])
     out["rollback"] = twin.rollback_profile(previous, previous_operator)
@@ -108,7 +131,7 @@ def guarded_profile_transition(twin: FleetTwin, target: str, approval: str | Non
 
 def _done(out: dict, states: list[str]) -> dict:
     if tuple(states) not in TRANSITION_PATHS:
-        raise RuntimeError(f"illegal eUICC transition path {states}")
+        raise RuntimeError(f"illegal profile-switch path {states}")
     return {**out, "transition": states}
 
 

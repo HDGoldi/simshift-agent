@@ -2,6 +2,7 @@
  "scenario": "BR_PROFILE",
  "title": "Brazil: active profile cannot register; alternate installed profile",
  "approved": true,
+ "human_answers": {},
  "bedrock_model": "eu.anthropic.claude-haiku-5-5",
  "trace": [
   {
@@ -45,8 +46,8 @@
      },
      "confidence": 0.0404,
      "model": "strands-decider-2B-qwen3.5-v1-2610",
-     "latency_ms": 516.65,
-     "client_latency_ms": 536.5
+     "latency_ms": 122.19,
+     "client_latency_ms": 135.3
     },
     "selected": "investigate_data_path",
     "route": "gather_evidence",
@@ -115,8 +116,8 @@
      },
      "confidence": 0.1993,
      "model": "strands-decider-2B-qwen3.5-v1-2610",
-     "latency_ms": 422.55,
-     "client_latency_ms": 424.5
+     "latency_ms": 90.74,
+     "client_latency_ms": 91.8
     },
     "selected": "investigate_device",
     "route": "gather_evidence",
@@ -177,11 +178,11 @@
      }
     },
     "eligible": {
-     "retry_connection": "Bounded backoff and re-attach on the current profile and operator; suits brief or improving disruptions",
      "evaluate_profile_change": "Assess a managed switch to an installed alternate eSIM profile (does not execute it); suits an active profile that cannot register on any allowed operator",
      "escalate_or_wait": "Hold and hand off to a human with the collected evidence; suits cases no admissible remote action can fix"
     },
     "excluded": {
+     "retry_connection": "serving network rejects registration (reject cause seen); a re-attach on the same operator meets the same reject and network back-off",
      "try_allowed_operator": "active profile permits no other operator in coverage",
      "investigate_device": "evidence already collected",
      "investigate_data_path": "evidence already collected"
@@ -189,18 +190,17 @@
     "raw": {
      "choice": "evaluate_profile_change",
      "probabilities": {
-      "retry_connection": 0.0939,
-      "evaluate_profile_change": 0.8742,
-      "escalate_or_wait": 0.0319
+      "evaluate_profile_change": 0.9391,
+      "escalate_or_wait": 0.0609
      },
-     "confidence": 0.8113,
+     "confidence": 0.8781,
      "model": "strands-decider-2B-qwen3.5-v1-2610",
-     "latency_ms": 482.22,
-     "client_latency_ms": 484.0
+     "latency_ms": 105.44,
+     "client_latency_ms": 106.5
     },
     "selected": "evaluate_profile_change",
     "route": "act",
-    "reason": "confidence 0.81 >= 0.5",
+    "reason": "confidence 0.88 >= 0.5",
     "tool": "prepare_guarded_profile_transition"
    },
    "tool": "prepare_guarded_profile_transition",
@@ -209,27 +209,27 @@
     "target": "profile_B",
     "bedrock_plan": {
      "recommend_proceeding": true,
-     "rationale": "The evidence points to a serving-operator problem rather than a device problem. The modem is healthy (0.1 resets/day), firmware is uniform with no recent change, and the device reports reject cause #17 (\"network failure\") from BR-NET-1. Attach success is 4%, data sessions 3%, and app acknowledgements 0%. Three retries have not recovered the fleet. Profile_B (BR-NET-2) is already installed, and profile_A's policy does not allow any other operator, so switching profiles is the only in-band path to a different network. The management path is reachable, so the switch can be observed and reversed. Because profile_A stays installed, rollback is available. Proceeding is advisable as a staged, reversible change, not as an immediate fleet-wide cutover. Confirm the fault is isolated to BR-NET-1 before the full cutover, and check that BR-NET-2 is viable for these devices before moving all 3,200 of them.",
+     "rationale": "The evidence points to a serving-network fault rather than a device fault. Attach success is 4% across 3,200 devices, and the modem is healthy with uniform firmware, no recent firmware change, and only 0.1 modem resets per day. The reject cause is #17 from BR-NET-1, and there are no PDN sessions. Retries have not helped, and profile_A cannot attach to any other operator, so the device has no in-profile fallback. profile_B (BR-NET-2) is already installed, and the management path is reachable, which makes a controlled switch a reasonable remediation. It is advisable only as a staged, reversible change: start with a canary subset, confirm BR-NET-2 actually accepts attaches for these devices, and keep a verified rollback before scaling to the full cohort. The switch is not authorized by this review.",
      "risks": [
-      "Reject cause #17 is generic. BR-NET-1 may be experiencing a wider outage or an issue with this device's subscription or IMEI. If so, the problem may not be fixed by switching, and BR-NET-2 could reject the same devices for the same reason.",
-      "BR-NET-2 has not been validated for this cohort. Coverage at device locations, subscription provisioning, data plan, APN and IP settings, and roaming or contract terms all need checking before cutover.",
-      "Switching all 3,200 devices at once could create a signalling surge (thundering herd) on BR-NET-2 and cause mass attach failures there too.",
-      "A profile switch can fail partway through (download, enable, or disable step). A device left with no enabled profile would lose connectivity, and recovery might require physical or out-of-band access.",
-      "Profile_A and profile_B must not both be enabled. The switch sequence has to disable A before enabling B to avoid a conflicting or non-attaching state.",
-      "Changing operator changes network identity (MSISDN/IMSI, IP range, possibly the public address). Backend allowlists, APN-bound services, firewall rules, and device identity records may break.",
-      "Management path reachability must be confirmed as independent of the cellular link. If the management path depends on BR-NET-1, the switch may be irreversible from the control plane.",
-      "Rollback is only useful if BR-NET-1 recovers or the fault is confirmed as transient. Reverting to profile_A while BR-NET-1 is still failing would restore a non-working state.",
-      "Switching operators may change billing, contractual obligations, data-usage limits, and regulatory requirements in Brazil (e.g., ANATEL rules, data residency, or lawful intercept). These need review before fleet-wide use.",
-      "Zero app acknowledgements means application-level behaviour after the switch is unverified. Heartbeat and ack paths need end-to-end testing on BR-NET-2 before the change is considered successful.",
-      "Retries have already run three times. Further automatic retries or mass switching could add load and cost without a clear success signal. A canary group with explicit success and abort thresholds is needed.",
-      "The pre-switch state for the rest of the fleet is unknown. Some devices may already be partly attached or in a mixed profile state. Inventory and state reconciliation should happen before the change."
+      "Management path may depend on the current connectivity (BR-NET-1). If the profile switch drops the link, devices could become unreachable and require site or manual recovery.",
+      "profile_B is disabled and BR-NET-2 has not been validated for these devices. Attach, IMSI/subscription provisioning, APN, and data-session behavior on BR-NET-2 are unverified.",
+      "BR-NET-2 may have its own coverage gaps in the device deployment locations, so some devices may fail to attach there even after switching.",
+      "The #17 reject may be a BR-NET-1 outage that is also transient. If it recovers after the switch, a fleet-wide move could cause unnecessary cost, churn, or service disruption.",
+      "The eSIM profile enable/disable operation may fail partway through (download, enable, or disable step). Devices could end up with no enabled profile, which would be a worst-case outage.",
+      "Commercial, contractual, or regulatory constraints (roaming terms, Anatel rules, billing, data-plan differences, or IoT subscription terms) for BR-NET-2 may not be cleared for this fleet.",
+      "Fleet-wide simultaneous switching could overload the BR-NET-2 network or the management/provisioning backend (thundering herd on attach and authentication).",
+      "Rollback to profile_A may not be possible if BR-NET-1 remains rejecting. Once profile_A is disabled, the device may have no working profile, so rollback must be validated before the change.",
+      "Application-layer state (heartbeat, ack, cached endpoints, or IP/APN-bound configuration) may not recover cleanly after a change of operator, even once attach succeeds (app_ack_rate is currently 0.0).",
+      "Partial success sampling is limited: the observed rates are aggregate, so the specific subset of devices that could succeed on BR-NET-2 is unknown until the canary runs."
      ]
     },
     "executed": true,
     "gate": {
      "target": "profile_B",
+     "proposal_id": "b6a82b340f124789.0",
      "checks": {
       "euicc_supports_profile_enable": true,
+      "rollback_supported": true,
       "active_profile_failing_registration": true,
       "registration_reject_evidence": true,
       "no_operator_reselection_available": true,
@@ -240,8 +240,7 @@
       "human_approval": true
      },
      "allowed": true,
-     "failed": [],
-     "idempotency_key": "b6a82b340f124789"
+     "failed": []
     },
     "eim": {
      "seq": 3,
@@ -249,7 +248,8 @@
      "ok": true,
      "from_profile": "profile_A",
      "to_profile": "profile_B",
-     "ipa_ack": true,
+     "result_reported": true,
+     "rollback_authorized": true,
      "serving_operator": "BR-NET-2",
      "restored": true,
      "rates": {
@@ -259,7 +259,16 @@
       "heartbeat_rate": 0.99
      }
     },
-    "verified_restored": true
+    "verified_restored": true,
+    "transition": [
+     "REQUESTED",
+     "VALIDATED",
+     "APPROVED",
+     "DELIVERED",
+     "RESULT_REPORTED",
+     "VERIFYING",
+     "SUCCEEDED"
+    ]
    },
    "rates_after": {
     "attach_success_rate": 0.997,
@@ -285,9 +294,13 @@
   },
   "active_profile": "profile_B",
   "serving_operator": "BR-NET-2",
-  "steps": 3
+  "steps": 3,
+  "simulated_minutes": 55,
+  "profile_changes": 1,
+  "forbidden_executions": 0,
+  "blocked_calls": 0
  },
- "explanation": "**Observed**\n- No data sessions; attach failing on BR-NET-1.\n- Modem healthy; registration rejected with cause #17 from BR-NET-1.\n- Profile_A allowed no other operator; profile_B was already installed.\n- Gates passed, including human approval. Switched profile_A to profile_B; BR-NET-2 is now serving.\n- Attach 4% to 99.7%, data 3% to 99%, app ack 0% to 99.5%, heartbeat 4% to 99%.\n\n**Why:** The modem looked healthy, so the agent judged a device fault unlikely. It moved to the only in-band alternative network as a reversible change, keeping profile_A installed.\n\n**Uncertain**\n- Root cause of #17: a BR-NET-1 outage or a subscription/IMEI issue.\n- Scope: the trace does not confirm whether all 3,200 devices switched.\n- Whether the post-switch rates are fleet-wide or sampled.\n- Billing, regulatory, and allowlist impacts are unverified.",
+ "explanation": "Bedrock explanation unavailable: MaxTokensReachedException('Model stopped generating due to maximum token limit. The partial message has been added to the conversation history. You can continue by calling the agent again. For more information see: https://strandsagents.com/docs/user-guide/concepts/agents/agent-loop/#maxtokensreachedexception')",
  "events": [
   {
    "seq": 1,
@@ -314,7 +327,8 @@
    "ok": true,
    "from_profile": "profile_A",
    "to_profile": "profile_B",
-   "ipa_ack": true,
+   "result_reported": true,
+   "rollback_authorized": true,
    "serving_operator": "BR-NET-2",
    "restored": true,
    "rates": {
@@ -324,5 +338,6 @@
     "heartbeat_rate": 0.99
    }
   }
- ]
+ ],
+ "decider_source": "live http://127.0.0.1:8099"
 }

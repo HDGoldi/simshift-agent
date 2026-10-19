@@ -1,7 +1,7 @@
 {
  "scenario": "DE_OPERATOR",
  "title": "Germany: primary network degraded; allowed alternative operator on same profile",
- "approved": false,
+ "approved": true,
  "human_answers": {},
  "bedrock_model": "eu.anthropic.claude-haiku-5-5",
  "trace": [
@@ -46,8 +46,8 @@
      },
      "confidence": 0.4666,
      "model": "strands-decider-2B-qwen3.5-v1-2610",
-     "latency_ms": 123.72,
-     "client_latency_ms": 146.2
+     "latency_ms": 124.45,
+     "client_latency_ms": 142.7
     },
     "selected": "investigate_data_path",
     "route": "gather_evidence",
@@ -116,8 +116,8 @@
      },
      "confidence": 0.6232,
      "model": "strands-decider-2B-qwen3.5-v1-2610",
-     "latency_ms": 123.54,
-     "client_latency_ms": 125.5
+     "latency_ms": 121.08,
+     "client_latency_ms": 125.0
     },
     "selected": "try_allowed_operator",
     "route": "act",
@@ -196,13 +196,13 @@
   }
  ],
  "mode": "orchestrated",
- "report": "**What happened**\nThis is a simulated DE incident. Attach failures on DE-NET-1 affected 8,400 devices, with attach success at 0.04 and app ACK at 0.0. Diagnostics showed no PDN sessions. The management path was unreachable and no modem logs were retrievable.\n\n**Decisions**\n- **Step 1:** Policy removed `investigate_device` (devices unreachable, no logs) and `evaluate_profile_change` (no management path to the IPA, so no OTA change). Choice: `try_allowed_operator` (p=0.60), but confidence was 0.47, below the 0.5 threshold, so the route was gather_evidence. Tool run: `query_apn_session_app_diagnostics`, which succeeded and confirmed no data sessions and attach failing on DE-NET-1.\n- **Step 2:** Policy also removed `investigate_data_path` (evidence already collected). Choice: `try_allowed_operator` (p=0.75), confidence 0.62, route act. Tool run: `simulate_operator_reselection` from DE-NET-1 to DE-NET-2, which succeeded and was marked restored.\n\n**Outcome**\nRates after the final step: attach 0.997, data session 0.99, app ACK 0.995, heartbeat 0.99. The incident is restored. No profile change was made or needed; the active profile remained profile_A.\n\n**Next**\n- Confirm the restoration on live devices, since this run was simulated.\n- Investigate the DE-NET-1 attach failure root cause with the operator.\n- Restore the management path so profile and modem diagnostics are available for future incidents.",
+ "report": "**What happened**\nAttach failures on the primary network (DE, 8,400 devices, serving operator DE-NET-1). Attach success was 0.04 and app ack was 0.0. The management path was unreachable. This is a simulated fleet, so all results are simulated.\n\n**Decisions**\n- **Step 1:** Policy removed `investigate_device` (devices unreachable, no modem logs) and `evaluate_profile_change` (no management path for OTA). The decider chose `try_allowed_operator` at 0.47 confidence, below the 0.5 threshold, so it routed to gather_evidence. Tool: `query_apn_session_app_diagnostics`, which reported no PDN sessions and attach failing on DE-NET-1.\n- **Step 2:** Policy also removed `investigate_data_path` (evidence already collected). The decider chose `try_allowed_operator` at 0.62 confidence, routed to act. Tool: `simulate_operator_reselection`, DE-NET-1 to DE-NET-2, reported ok and restored.\n\n**Outcome**\n- Final rates: attach 0.997, data session 0.99, app ack 0.995, heartbeat 0.99. Restored: yes.\n- No profile change was made. The active profile remained profile_A, so no approval was needed.\n\n**Next**\n- Confirm DE-NET-2 stability over a longer window.\n- Investigate the DE-NET-1 attach failure with the operator, since device-side logs were not retrievable.\n- Restore the management path so the devices can be inspected directly.",
  "report_after_fallback": false,
  "bedrock_error": null,
  "bedrock_usage": {
-  "inputTokens": 4986,
-  "outputTokens": 713,
-  "totalTokens": 5699
+  "inputTokens": 5134,
+  "outputTokens": 700,
+  "totalTokens": 5834
  },
  "advance_calls": 2,
  "decider_source": "live http://127.0.0.1:8099"

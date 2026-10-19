@@ -51,7 +51,7 @@ def test_no_truth_leakage():
         r = run(sid, approve=True, decider=dec, use_bedrock=False)
         sent = "".join(dec.calls) + json.dumps([t["decision"]["state"] for t in r["trace"]])
         for secret in (sc["hidden"]["cause"], sid, "best_actions", '"networks"', "ingestion_healthy",
-                       "firmware_fault", "transient_congestion"):
+                       "firmware_fault", "transient_congestion", "management_drops_on_switch"):
             assert secret not in sent, (sid, secret)
 
 
@@ -102,7 +102,8 @@ def test_no_truth_leakage_in_bedrock_prompts(monkeypatch):
         if sid == "BR_PROFILE":
             assert r["outcome"]["restored"] and len(prompts) == 2  # plan + explanation both checked
         for secret in (sc["hidden"]["cause"], sid, "best_actions", '"networks"', "ingestion_healthy",
-                       "device_powered", '"hidden"', "firmware_fault", "transient_congestion"):
+                       "device_powered", '"hidden"', "firmware_fault", "transient_congestion",
+                       "management_drops_on_switch"):
             assert secret not in sent, (sid, secret)
 
 
@@ -219,7 +220,7 @@ def test_failed_profile_change_escalates(monkeypatch, changes, end):
 def test_rollback_failure_escalates(monkeypatch):
     from simshift.simulator import FleetTwin
     sid = _br_variant(monkeypatch, **{"networks.BR-NET-2": "down"})
-    monkeypatch.setattr(FleetTwin, "rollback_profile",  # e.g. the depot gateway goes offline mid-change
+    monkeypatch.setattr(FleetTwin, "rollback_profile",  # e.g. the eUICC refuses the re-enable
                         lambda self, prev, op: self._log("eim_rollback", ok=False, reason="IPA unreachable"))
     r = run(sid, approve=True, decider=ScriptedDecider(["investigate_device", "evaluate_profile_change"]),
             use_bedrock=False)
@@ -264,3 +265,53 @@ def test_cli_printer_handles_a_failed_bedrock_review(monkeypatch, capsys):
     r = ag.run("BR_PROFILE", approve=True, decider=ScriptedDecider(["investigate_device", "evaluate_profile_change"]))
     ag._print(r, "test")
     assert "Bedrock review unavailable" in capsys.readouterr().out
+
+
+def test_unconfirmed_switch_is_handed_off_without_a_second_command(monkeypatch):  # audit T10
+    from simshift.validate import problems
+    sid = _br_variant(monkeypatch, **{"networks.BR-NET-2": "down", "management_drops_on_switch": True})
+    r = run(sid, approve=True, decider=ScriptedDecider(["investigate_device", "evaluate_profile_change"]),
+            use_bedrock=False)
+    change = next(t for t in r["trace"] if t["tool"] == TOOLS["evaluate_profile_change"])
+    assert change["tool_result"]["transition"][-1] == "UNCONFIRMED"
+    assert "UNCONFIRMED" in r["trace"][-1]["note"] and r["trace"][-1]["tool"] == TOOLS["escalate_or_wait"]
+    kinds = [e["kind"] for e in r["events"]]
+    assert "ipa_local_rollback" in kinds and "eim_rollback" not in kinds
+    assert r["outcome"]["active_profile"] == "profile_A" and problems(r) == []  # outcome reports the real state
+
+
+def test_cli_prints_each_step_before_the_approval_prompt(tmp_path):
+    """The operator sees the evidence and the gate before being asked to approve."""
+    import os
+    import pty
+    import subprocess
+    import sys
+    from simshift.agent import Incident, write_trace
+    inc = Incident("BR_PROFILE", decider=ScriptedDecider(["investigate_device", "evaluate_profile_change"]),
+                   use_bedrock=False)
+    while not inc.done:
+        inc.step()
+    rec = tmp_path / "pending.json"
+    write_trace(str(rec), inc.result())  # ends pending; the replay asks the terminal again
+    master, slave = pty.openpty()
+    p = subprocess.Popen([sys.executable, "-m", "simshift.agent", "BR_PROFILE", "--no-bedrock", "--replay", str(rec)],
+                         stdin=slave, stdout=slave, stderr=slave, cwd=os.path.dirname(os.path.dirname(__file__)))
+    os.close(slave)
+    out = b""
+    while b"[y/N]" not in out:
+        chunk = os.read(master, 4096)
+        assert chunk, out
+        out += chunk
+    os.write(master, b"n\n")
+    p.wait(timeout=30)
+    text = out.decode()
+    assert text.index("[2]") < text.index("-> tool prepare_guarded_profile_transition") < text.index("[y/N]")
+
+
+def test_a_malformed_answer_cannot_stop_the_cli_before_the_trace_is_written(capsys):  # Codex review
+    import simshift.agent as ag
+    bad = {"step": 1, "tool": "defer_or_escalate", "tool_status": "success", "tool_result": {},
+           "decision": {"raw": {"choice": "x", "probabilities": {"x": "0.9"}, "confidence": "high"},
+                        "excluded": {}, "route": "fallback", "reason": "inconsistent Decider answer"}}
+    ag._print_step_safely(bad)  # the plain printer would raise on the string values
+    assert "could not print this step" in capsys.readouterr().out

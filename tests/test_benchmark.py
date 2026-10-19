@@ -60,7 +60,7 @@ def derive(row: dict) -> dict:
     from simshift.simulator import RESTORED_THRESHOLD
     last = row["trace"][-1]
     rates = last["rates_after"]
-    restored = rates["attach_success_rate"] >= RESTORED_THRESHOLD and rates["app_ack_rate"] >= RESTORED_THRESHOLD
+    restored = all(rates[k] >= RESTORED_THRESHOLD for k in ("attach_success_rate", "data_session_rate", "app_ack_rate"))
     end = "restored" if restored else "escalated" if last["tool"] == "defer_or_escalate" else "stuck"
     fam = row["family"]
     kinds = {e["kind"] for e in row["events"]}
@@ -85,9 +85,15 @@ def test_published_benchmark_is_reproducible_from_its_records(path, monkeypatch)
     for chooser, rows in d["results"].items():
         assert summarize(rows) == d["summary"][chooser], chooser  # headline numbers come from the stored rows
         for row in rows:
+            if chooser == "decider":  # client wall clock includes the server's own measured latency for that call
+                server = [t["decision"]["raw"]["latency_ms"] for t in row["trace"]
+                          if t["decision"] and (t["decision"]["raw"] or {}).get("latency_ms") is not None]
+                assert len(server) == len(row["chooser_ms"]), row["incident"]
+                assert all(c >= s for c, s in zip(row["chooser_ms"], server)), row["incident"]
             derived = derive(row)
             assert {k: row[k] for k in derived} == derived, (chooser, row["incident"])
             fam, seed = row["incident"].split("-")[1], int(row["incident"].split("-")[2])
             monkeypatch.setitem(SCENARIOS, row["incident"], make(fam, seed))  # regenerate: seeds are deterministic
-            run = {"scenario": row["incident"], "trace": row["trace"], "events": row["events"], "outcome": row["outcome"]}
+            run = {"scenario": row["incident"], "trace": row["trace"], "events": row["events"], "outcome": row["outcome"],
+                   "approved": True}  # the benchmark auto-approves every proposal (documented in simshift/benchmark.py)
             assert problems(run) == [], (chooser, row["incident"], problems(run))

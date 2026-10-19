@@ -1,7 +1,7 @@
 {
  "scenario": "TRANSIENT",
  "title": "France: short burst of attach failures after a cell site restart",
- "approved": false,
+ "approved": true,
  "human_answers": {},
  "bedrock_model": "eu.anthropic.claude-haiku-5-5",
  "trace": [
@@ -47,8 +47,8 @@
      },
      "confidence": 0.7904,
      "model": "strands-decider-2B-qwen3.5-v1-2610",
-     "latency_ms": 119.68,
-     "client_latency_ms": 136.3
+     "latency_ms": 127.86,
+     "client_latency_ms": 141.7
     },
     "selected": "retry_connection",
     "route": "act",
@@ -113,13 +113,13 @@
   }
  ],
  "mode": "orchestrated",
- "report": "**What happened**\nThis is a simulated FR incident on FR-NET-1, affecting 2,100 devices. At the start, attach success was 0.62, data session 0.59, app ack 0.58 and heartbeat 0.63. The attach trend was improving, no firmware change had been recorded, and no retries had been attempted.\n\n**Decisions**\n- **Step 1:** Policy removed `try_allowed_operator` (the active profile permits no other operator in coverage) and `evaluate_profile_change` (it needs modem registration-reject evidence first). The decision model chose `retry_connection` with confidence 0.79, routed as \"act\". The tool `simulate_retry_with_backoff` succeeded and reported restored.\n\n**Outcome**\n- Final rates: attach 0.997, data session 0.99, app ack 0.995, heartbeat 0.99. The run is terminal and restored.\n- No profile change was made, so no approval was needed.\n\n**Next**\n- No further action is needed for recovery. I'd suggest confirming the rates on the live fleet, since this run was simulated.\n- Because the profile change was never evaluated, there is no registration-reject cause on record. Collect that evidence if the attach failures recur.\n\nAll data in this report comes from a simulated environment.",
+ "report": "**What happened**\nA simulated FR incident: attach success fell to 0.62 across 2,100 devices, with data session, app ack and heartbeat rates at 0.59, 0.58 and 0.63. The device was on profile_A with FR-NET-1. The alternative profile was installed, and the management path was reachable. This is a simulation.\n\n**Decisions**\n- **Step 1.** Policy removed `try_allowed_operator` (the active profile permits no other operator) and `evaluate_profile_change` (needs modem reject-cause evidence first). The decider chose `retry_connection` at 0.84 probability, with confidence 0.79. Route: act. Tool: simulate_retry_with_backoff, which succeeded.\n- **Second call.** I issued a second advance_recovery call in parallel with the first, which was a mistake on my part. It returned \"incident finished\" and ran no step.\n\n**Outcome**\nRestored. After step 1, attach success was 0.997, data session 0.99, app ack 0.995 and heartbeat 0.99. No profile change was made, so no approval was needed.\n\n**Next**\n- Confirm the rates hold over a longer window.\n- Check the FR-NET-1 cause of the burst, since the retry alone does not identify it.\n- Note that the pre-retry state had no diagnostics and no retry attempts recorded.",
  "report_after_fallback": false,
  "bedrock_error": null,
  "bedrock_usage": {
-  "inputTokens": 3171,
-  "outputTokens": 529,
-  "totalTokens": 3700
+  "inputTokens": 3467,
+  "outputTokens": 669,
+  "totalTokens": 4136
  },
  "advance_calls": 1,
  "decider_source": "live http://127.0.0.1:8099"

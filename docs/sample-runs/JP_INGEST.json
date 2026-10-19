@@ -2,6 +2,7 @@
  "scenario": "JP_INGEST",
  "title": "Japan: cellular healthy, application ACKs failing",
  "approved": true,
+ "human_answers": {},
  "bedrock_model": "eu.anthropic.claude-haiku-5-5",
  "trace": [
   {
@@ -44,8 +45,8 @@
      },
      "confidence": 0.7094,
      "model": "strands-decider-2B-qwen3.5-v1-2610",
-     "latency_ms": 446.38,
-     "client_latency_ms": 460.5
+     "latency_ms": 123.97,
+     "client_latency_ms": 135.5
     },
     "selected": "investigate_data_path",
     "route": "act",
@@ -117,8 +118,8 @@
      },
      "confidence": 0.0854,
      "model": "strands-decider-2B-qwen3.5-v1-2610",
-     "latency_ms": 431.21,
-     "client_latency_ms": 432.9
+     "latency_ms": 96.51,
+     "client_latency_ms": 97.7
     },
     "selected": "investigate_device",
     "route": "gather_evidence",
@@ -240,9 +241,13 @@
   },
   "active_profile": "profile_A",
   "serving_operator": "JP-NET-1",
-  "steps": 3
+  "steps": 3,
+  "simulated_minutes": 85,
+  "profile_changes": 0,
+  "forbidden_executions": 0,
+  "blocked_calls": 0
  },
- "explanation": "**What the agent did:** It checked the data path first. Cellular attach and APN were healthy, but the ingest endpoint returned HTTP 5xx on 98% of requests, and the summary links this to deploy ingest-v2.14. It then checked the device: firmware was uniform, the modem was healthy, and there was no reject cause. With low confidence (0.09), it chose escalate-or-wait and escalated. It excluded retries, operator changes, and profile changes because registration was already healthy.\n\n**Observed:** App ack rate stayed at 0.02 before and after the run. Attach (0.997), data session (0.99), and heartbeat (0.99) were unchanged. The run did not restore service.\n\n**Uncertain:** Whether ingest-v2.14 caused the failure. The link is stated in the summary but not tested. Why the device check was judged insufficient. Whether any remediation was attempted, since the trace shows none.",
+ "explanation": "**Observed:** Step 1 showed the cellular link and APN healthy, but the ingest endpoint returned HTTP 5xx on 98% of requests, summarized as rejecting payloads since deploy ingest-v2.14. The agent chose to investigate the data path (p=0.81). Step 2 found the modem healthy (0.1 resets/day, no reject cause). The agent then chose escalate_or_wait at low confidence (0.085) and escalated. The outcome was not restored: app_ack_rate stayed at 0.02 while attach, data session, and heartbeat stayed near 0.99. No profile changes were made.\n\n**Uncertain:** Whether ingest-v2.14 caused the failure. The trace shows timing, not a confirmed cause. The trace also doesn't show why the agent escalated instead of acting on the ingest fault, or whether a rollback would help.",
  "events": [
   {
    "seq": 1,
@@ -264,6 +269,26 @@
     "reject_cause": null,
     "summary": "modem healthy"
    }
+  },
+  {
+   "seq": 3,
+   "kind": "escalated",
+   "evidence": {
+    "data_path": {
+     "pdn_sessions": "established",
+     "apn": "ok",
+     "ingest_http_5xx_rate": 0.98,
+     "summary": "cellular + APN healthy; ingestion endpoint rejecting payloads since deploy ingest-v2.14"
+    },
+    "device": {
+     "available": true,
+     "firmware_uniform": true,
+     "modem_resets_per_day": 0.1,
+     "reject_cause": null,
+     "summary": "modem healthy"
+    }
+   }
   }
- ]
+ ],
+ "decider_source": "live http://127.0.0.1:8099"
 }

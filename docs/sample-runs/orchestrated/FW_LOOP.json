@@ -1,7 +1,7 @@
 {
  "scenario": "FW_LOOP",
  "title": "US: devices keep dropping off after a firmware rollout",
- "approved": false,
+ "approved": true,
  "human_answers": {},
  "bedrock_model": "eu.anthropic.claude-haiku-5-5",
  "trace": [
@@ -47,8 +47,8 @@
      },
      "confidence": 0.3859,
      "model": "strands-decider-2B-qwen3.5-v1-2610",
-     "latency_ms": 117.93,
-     "client_latency_ms": 130.6
+     "latency_ms": 126.69,
+     "client_latency_ms": 151.3
     },
     "selected": "investigate_device",
     "route": "gather_evidence",
@@ -65,7 +65,8 @@
      "firmware_uniform": true,
      "modem_resets_per_day": 14.2,
      "reject_cause": null,
-     "summary": "modem reset loop on the firmware rolled out before onset; registration accepted between resets"
+     "same_cells_other_firmware": "stable",
+     "summary": "modem reset loop on the firmware rolled out before onset; registration accepted between resets; devices on older firmware in the same cells are stable"
     }
    },
    "rates_after": {
@@ -101,7 +102,8 @@
        "firmware_uniform": true,
        "modem_resets_per_day": 14.2,
        "reject_cause": null,
-       "summary": "modem reset loop on the firmware rolled out before onset; registration accepted between resets"
+       "same_cells_other_firmware": "stable",
+       "summary": "modem reset loop on the firmware rolled out before onset; registration accepted between resets; devices on older firmware in the same cells are stable"
       }
      }
     },
@@ -118,17 +120,17 @@
     "raw": {
      "choice": "escalate_or_wait",
      "probabilities": {
-      "investigate_data_path": 0.3771,
-      "escalate_or_wait": 0.6229
+      "investigate_data_path": 0.3548,
+      "escalate_or_wait": 0.6452
      },
-     "confidence": 0.2458,
+     "confidence": 0.2904,
      "model": "strands-decider-2B-qwen3.5-v1-2610",
-     "latency_ms": 124.98,
-     "client_latency_ms": 127.4
+     "latency_ms": 126.21,
+     "client_latency_ms": 128.0
     },
     "selected": "investigate_data_path",
     "route": "gather_evidence",
-    "reason": "confidence 0.25 < 0.5: most probable read-only option",
+    "reason": "confidence 0.29 < 0.5: most probable read-only option",
     "tool": "query_apn_session_app_diagnostics"
    },
    "tool": "query_apn_session_app_diagnostics",
@@ -175,7 +177,8 @@
        "firmware_uniform": true,
        "modem_resets_per_day": 14.2,
        "reject_cause": null,
-       "summary": "modem reset loop on the firmware rolled out before onset; registration accepted between resets"
+       "same_cells_other_firmware": "stable",
+       "summary": "modem reset loop on the firmware rolled out before onset; registration accepted between resets; devices on older firmware in the same cells are stable"
       },
       "data_path": {
        "pdn_sessions": "flapping",
@@ -210,7 +213,8 @@
       "firmware_uniform": true,
       "modem_resets_per_day": 14.2,
       "reject_cause": null,
-      "summary": "modem reset loop on the firmware rolled out before onset; registration accepted between resets"
+      "same_cells_other_firmware": "stable",
+      "summary": "modem reset loop on the firmware rolled out before onset; registration accepted between resets; devices on older firmware in the same cells are stable"
      },
      "data_path": {
       "pdn_sessions": "flapping",
@@ -259,7 +263,8 @@
     "firmware_uniform": true,
     "modem_resets_per_day": 14.2,
     "reject_cause": null,
-    "summary": "modem reset loop on the firmware rolled out before onset; registration accepted between resets"
+    "same_cells_other_firmware": "stable",
+    "summary": "modem reset loop on the firmware rolled out before onset; registration accepted between resets; devices on older firmware in the same cells are stable"
    }
   },
   {
@@ -280,7 +285,8 @@
      "firmware_uniform": true,
      "modem_resets_per_day": 14.2,
      "reject_cause": null,
-     "summary": "modem reset loop on the firmware rolled out before onset; registration accepted between resets"
+     "same_cells_other_firmware": "stable",
+     "summary": "modem reset loop on the firmware rolled out before onset; registration accepted between resets; devices on older firmware in the same cells are stable"
     },
     "data_path": {
      "pdn_sessions": "flapping",
@@ -291,13 +297,13 @@
   }
  ],
  "mode": "orchestrated",
- "report": "**What happened** (simulated environment): 5,400 devices on US-NET-1 are dropping off repeatedly. Attach success is 0.41, data session 0.38, app ack 0.37, heartbeat 0.42. Attach trend is flapping, and a firmware change was rolled out just before onset.\n\n**Decisions**\n- **Step 1:** Policy removed try_allowed_operator (no other operator permitted on profile_A) and evaluate_profile_change (needs a reject cause). The model chose retry_connection (confidence 0.39, below 0.5), so it routed to gather_evidence. Diagnostics showed a modem reset loop (14.2 resets/day) on the uniform firmware, with no reject cause.\n- **Step 2:** Policy also removed retry_connection (re-attach cannot fix a reset loop) and investigate_device (already done). The model chose escalate_or_wait (confidence 0.25), routed to gather_evidence. Data path diagnostics showed flapping PDN sessions, with APN and ingestion healthy.\n- **Step 3:** Only the fallback was admissible. Defer/escalate ran and the incident was escalated.\n\n**Outcome**\nRates after the last step are unchanged: attach 0.41, data session 0.38, app ack 0.37, heartbeat 0.42. Not restored. No profile change was made. Policy blocked it because no registration reject cause was found.\n\n**Next**\n- Engineer to review the firmware rolled out before onset, since the modem reset loop points to it. Consider rollback after approval.\n- Reject-cause capture is needed before any profile switch is considered.\n- Monitor the flapping attach trend while the escalation is pending.",
+ "report": "**What happened:** 5,400 devices are dropping off the network repeatedly. Attach success is 0.41, data session 0.38, app ack 0.37, heartbeat 0.42, and attach is flapping. The incident began after a recent firmware change. (All of this is simulated.)\n\n**Decisions:**\n- **Step 1:** Policy removed \"try allowed operator\" (no other operator permitted on the active profile) and \"evaluate profile change\" (needs a registration reject cause). Choice: retry_connection, confidence 0.39, route: gather_evidence. Ran query_firmware_modem_diagnostics. Found a modem reset loop (14.2 resets/day) on the newer firmware. Devices on older firmware in the same cells are stable. No reject cause was reported.\n- **Step 2:** Policy also removed retry_connection, since re-attaching cannot fix a reset loop. Choice: escalate_or_wait, confidence 0.29, route: gather_evidence. Ran query_apn_session_app_diagnostics. PDN sessions are flapping, but APN and ingestion are healthy.\n- **Step 3:** Only the fallback was admissible. Ran defer_or_escalate, which escalated the incident with the evidence above.\n\n**Outcome:** Rates are unchanged after the last step: attach 0.41, data session 0.38, app ack 0.37, heartbeat 0.42. Not restored. No profile change was made, and none was approved or needed.\n\n**Next:**\n- Engineering review of the recent firmware rollout. The evidence points to it, and rolling back on the affected devices is the likely fix, but this needs human approval.\n- Obtain a registration reject cause from the network side. The profile-switch evaluation depends on it.\n- Monitor the rates until escalation is acknowledged.",
  "report_after_fallback": false,
  "bedrock_error": null,
  "bedrock_usage": {
-  "inputTokens": 7511,
-  "outputTokens": 769,
-  "totalTokens": 8280
+  "inputTokens": 7824,
+  "outputTokens": 818,
+  "totalTokens": 8642
  },
  "advance_calls": 3,
  "decider_source": "live http://127.0.0.1:8099"

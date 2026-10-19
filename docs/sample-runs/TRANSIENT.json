@@ -1,0 +1,116 @@
+{
+ "scenario": "TRANSIENT",
+ "title": "France: short burst of attach failures after a cell site restart",
+ "approved": true,
+ "human_answers": {},
+ "bedrock_model": "eu.anthropic.claude-haiku-5-5",
+ "trace": [
+  {
+   "step": 1,
+   "decision": {
+    "question": "Given the cellular connectivity symptoms, diagnostic evidence so far, and only these admissible tools, which next tool is most useful for safely advancing service restoration? Do not assume an unverified recovery path works.",
+    "state": {
+     "incident": "Short burst of attach failures",
+     "country": "FR",
+     "affected_devices": 2100,
+     "attach_success_rate": 0.62,
+     "data_session_rate": 0.59,
+     "app_ack_rate": 0.58,
+     "heartbeat_rate": 0.63,
+     "serving_operator": "FR-NET-1",
+     "active_profile": "profile_A",
+     "other_operator_allowed_on_active_profile": false,
+     "alternative_profile_installed": true,
+     "management_path_reachable": true,
+     "recent_firmware_change": false,
+     "attach_trend": "improving",
+     "attempted_retries": 0,
+     "diagnostics": {}
+    },
+    "eligible": {
+     "retry_connection": "Bounded backoff and re-attach on the current profile and operator; suits brief or improving disruptions",
+     "investigate_device": "Read-only: pull modem and firmware diagnostics from the devices",
+     "investigate_data_path": "Read-only: check network-side data sessions, APN and application ingestion; suits devices that register but whose telemetry fails",
+     "escalate_or_wait": "Hold and hand off to a human with the collected evidence; suits cases no admissible remote action can fix"
+    },
+    "excluded": {
+     "try_allowed_operator": "active profile permits no other operator in coverage",
+     "evaluate_profile_change": "needs modem evidence (registration reject cause) before a profile switch"
+    },
+    "raw": {
+     "choice": "retry_connection",
+     "probabilities": {
+      "retry_connection": 0.8428,
+      "investigate_device": 0.0552,
+      "investigate_data_path": 0.0526,
+      "escalate_or_wait": 0.0494
+     },
+     "confidence": 0.7904,
+     "model": "strands-decider-2B-qwen3.5-v1-2610",
+     "latency_ms": 117.52,
+     "client_latency_ms": 129.5
+    },
+    "selected": "retry_connection",
+    "route": "act",
+    "reason": "confidence 0.79 >= 0.5",
+    "tool": "simulate_retry_with_backoff"
+   },
+   "tool": "simulate_retry_with_backoff",
+   "tool_status": "success",
+   "tool_result": {
+    "seq": 1,
+    "kind": "retry",
+    "restored": true,
+    "rates": {
+     "attach_success_rate": 0.997,
+     "data_session_rate": 0.99,
+     "app_ack_rate": 0.995,
+     "heartbeat_rate": 0.99
+    }
+   },
+   "rates_after": {
+    "attach_success_rate": 0.997,
+    "data_session_rate": 0.99,
+    "app_ack_rate": 0.995,
+    "heartbeat_rate": 0.99
+   }
+  }
+ ],
+ "outcome": {
+  "restored": true,
+  "initial_rates": {
+   "attach_success_rate": 0.62,
+   "data_session_rate": 0.59,
+   "app_ack_rate": 0.58,
+   "heartbeat_rate": 0.63
+  },
+  "final_rates": {
+   "attach_success_rate": 0.997,
+   "data_session_rate": 0.99,
+   "app_ack_rate": 0.995,
+   "heartbeat_rate": 0.99
+  },
+  "active_profile": "profile_A",
+  "serving_operator": "FR-NET-1",
+  "steps": 1,
+  "simulated_minutes": 5,
+  "profile_changes": 0,
+  "forbidden_executions": 0,
+  "blocked_calls": 0
+ },
+ "explanation": "**Observed:** The agent ran one simulated retry-with-backoff. The decider chose retry_connection (p\u22480.84, confidence 0.79), and the step was acted on. Rates rose from about 0.58\u20130.63 to 0.99\u20130.997 across attach, data session, app ack, and heartbeat, and restored=true. The device stayed on profile_A with FR-NET-1, with 0 profile changes, 0 forbidden executions, and 0 blocked calls over 5 simulated minutes.\n\n**Excluded:** Switching to another operator (none in coverage) and a profile change (which needs a registration reject cause the agent did not have).\n\nNo profile switch was attempted, so no switch state, confirmed or unconfirmed, applies.\n\n**Uncertain:** The trace does not show the root cause of the initial degradation, and the reject cause was never read. Whether the recovery holds beyond 5 simulated minutes, and how it behaves on a live device, is untested. The decider's confidence (0.79) is modest.",
+ "events": [
+  {
+   "seq": 1,
+   "kind": "retry",
+   "restored": true,
+   "rates": {
+    "attach_success_rate": 0.997,
+    "data_session_rate": 0.99,
+    "app_ack_rate": 0.995,
+    "heartbeat_rate": 0.99
+   }
+  }
+ ],
+ "decider_source": "live http://127.0.0.1:8099"
+}

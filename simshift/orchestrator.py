@@ -29,7 +29,8 @@ SYSTEM_PROMPT = """You are SIMShift, a recovery agent for a SIMULATED cellular I
    What happened / Decisions (per step: options removed by policy, the choice, its confidence, the route) /
    Outcome (rates after the last step, restored or not, any profile change and its approval) / Next.
 
-Quote numbers only from tool results; never invent measurements. Everything is simulated; say so once."""
+Quote numbers only from tool results; never invent measurements. A profile switch whose path ends UNCONFIRMED
+got no result from the device: call its state unconfirmed. Everything is simulated; say so once."""
 
 
 def _summary(t: dict, inc: Incident) -> dict:
@@ -127,6 +128,6 @@ if __name__ == "__main__":
         write_trace(a.out, res)
     _print(res, res["decider_source"])
     print(f"\nBedrock report, model-written and not checked against the trace; the outcome above is the record "
-          f"({res['bedrock_model']}, {res['advance_calls']} advance_recovery calls, "
+          f"({res['bedrock_model']}, {res['advance_calls']} advance_recovery call{'' if res['advance_calls'] == 1 else 's'}, "
           f"{res['bedrock_usage']}{', rewritten after a deterministic finish' if res['report_after_fallback'] else ''}):"
           f"\n{res['report'] or res['bedrock_error']}")

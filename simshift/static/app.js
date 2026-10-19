@@ -136,7 +136,10 @@ function render(s) {
   d.hidden = !s.done;
   if (s.done) {
     d.className = `done ${status[0]}`;
+    const end = s.transition && s.transition[s.transition.length - 1];
     d.textContent = o.restored ? `Service restored. Registration ${pct(reg)}, app telemetry ${pct(app)}.`
+      : escalated && ["UNCONFIRMED", "ROLLBACK_FAILED"].includes(end)
+        ? `Escalated to a human: the profile switch ended ${end}, so the eIM cannot vouch for the device state.`
       : escalated ? "Escalated to a human with the collected evidence. No unverified remote change was made."
       : "Stopped without recovery.";
   }
@@ -153,7 +156,9 @@ function render(s) {
 
 function eventText(e) {
   if (e.result) return e.result.summary || e.result.reason || "";
+  if (e.kind === "eim_enable_profile" && e.ok) return `ok → ${e.to_profile}${e.result_reported ? "" : " (no result reported to the eIM)"}`;
   if (e.kind.startsWith("eim_")) return e.ok ? `ok → ${e.to_profile}` : `refused: ${e.reason}`;
+  if (e.kind === "ipa_local_rollback") return `device rolled back ${e.from_profile} → ${e.to_profile} on its own`;
   if (e.kind === "operator_reselection") return e.ok ? `${e.from_operator} → ${e.to_operator}` : e.reason;
   return e.restored === undefined ? "" : `restored=${e.restored}`;
 }
@@ -191,7 +196,7 @@ function renderTrace(s) {
       : `<span class="muted">${esc(t.note)}</span>`;
     const res = typeof t.tool_result === "string" ? t.tool_result
       : (t.tool_result.result && t.tool_result.result.summary) || (t.tool_result.gate && (t.tool_result.executed
-        ? `profile ${t.tool_result.gate.target} enabled, verified=${t.tool_result.verified_restored}`
+        ? `profile switch to ${t.tool_result.gate.target} ended ${t.tool_result.transition.at(-1)}`
         : `gate stopped at: ${t.tool_result.gate.failed.join(", ")}`)) || (t.tool_result.escalated ? "handed off to a human" : "");
     return `<li><div class="row"><b>Step ${t.step}</b> ${head}<span class="arrow">→</span><code>${esc(t.tool)}</code>
       <span class="muted">[${esc(t.tool_status)}]</span></div>
@@ -208,7 +213,7 @@ function renderEuicc(s) {
     `<li class="muted small">Target ${esc(s.gate.target)} · ${s.transition ? "last attempt" : "live preview, no approval yet"}</li>`;
   const path = s.transition;
   $("timeline").innerHTML = path
-    ? path.map((x) => `<li style="color:var(--${["BLOCKED", "FAILED", "NOT_DELIVERED", "ROLLBACK_FAILED"].includes(x) ? "bad" : x === "SUCCEEDED" ? "ok" : x === "AWAITING_APPROVAL" ? "warn" : "text"})">${esc(x)}</li>`).join("")
+    ? path.map((x) => `<li style="color:var(--${["BLOCKED", "FAILED", "NOT_DELIVERED", "ROLLBACK_FAILED", "UNCONFIRMED"].includes(x) ? "bad" : x === "SUCCEEDED" ? "ok" : ["AWAITING_APPROVAL", "RESULT_PENDING"].includes(x) ? "warn" : "text"})">${esc(x)}</li>`).join("")
     : `<li class="muted">No profile transition yet.</li>`;
 }
 

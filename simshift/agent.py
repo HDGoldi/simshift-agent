@@ -220,7 +220,8 @@ class Incident:
             try:
                 explanation = _bedrock(self.llm, (
                     "Explain in at most 120 words, for a NOC engineer, what this simulated recovery agent did and why. "
-                    "Separate what was observed from what is uncertain. Do not invent facts beyond the trace.\n"
+                    "Separate what was observed from what is uncertain. Do not invent facts beyond the trace. A profile "
+                    "switch whose path ends UNCONFIRMED got no result from the device: call its state unconfirmed.\n"
                     + json.dumps({"trace": [{k: t[k] for k in ("step", "tool", "tool_result")} |
                                             ({"decider": t["decision"]["raw"], "route": t["decision"]["route"],
                                               "excluded": t["decision"]["excluded"]} if t["decision"] else {"note": t["note"]})
@@ -233,16 +234,17 @@ class Incident:
                 "trace": self.trace, "outcome": outcome, "explanation": explanation, "events": self.twin.events}
 
 
-def finish(inc: Incident, answer: Callable[[str, dict], bool | None]) -> None:
-    """Steps until done. When a proposal waits, `answer(proposal_id, gate)` approves (True), declines (False) or
-    leaves it pending (None)."""
+def finish(inc: Incident, answer: Callable[[str, dict], bool | None],
+           on_step: Callable[[dict], None] = lambda t: None) -> None:
+    """Steps until done, passing each recorded step to `on_step`. When a proposal waits, `answer(proposal_id, gate)`
+    approves (True), declines (False) or leaves it pending (None)."""
     while True:
         while not inc.done:
-            inc.step()
+            on_step(inc.step())
         pid = inc.pending_approval
         if pid is None or (choice := answer(pid, inc.trace[-1]["tool_result"]["gate"])) is None:
             return
-        inc.resolve_approval(choice)
+        on_step(inc.resolve_approval(choice))
 
 
 def recorded_answers(rec: dict) -> Callable[[str, dict], bool | None]:
@@ -257,29 +259,53 @@ def run(scenario_id: str, approve: bool = False, decider=None, use_bedrock: bool
     return inc.result()
 
 
-def _print(r: dict, decider_source: str) -> None:
-    bedrock = f"Bedrock {r['bedrock_model']}" if r["bedrock_model"] else "no Bedrock"
-    print(f"\n=== {r['scenario']}: {r['title']}  (SIMULATED fleet; Decider: {decider_source}; {bedrock})")
-    o = r["outcome"]
-    print(f"initial: {o['initial_rates']}")
-    for t in r["trace"]:
-        d = t["decision"]
-        if d is None:
-            print(f"\n[{t['step']}] {t['note']} -> tool {t['tool']}")
-            continue
-        raw = d["raw"] or {}
-        probs = ", ".join(f"{k}={v:.2f}" for k, v in sorted(raw.get("probabilities", {}).items(), key=lambda kv: -kv[1]))
-        print(f"\n[{t['step']}] excluded: {d['excluded'] or '-'}")
-        print(f"    Decider: choice={raw.get('choice')} conf={raw.get('confidence', 0):.2f} ({probs}) {raw.get('latency_ms')}ms")
-        print(f"    route={d['route']} ({d['reason']}) -> tool {t['tool']} [{t['tool_status']}]")
-        print(f"    result: {json.dumps(t['tool_result'])[:400]}")
-        plan = t["tool_result"].get("bedrock_plan") if isinstance(t["tool_result"], dict) else None
-        if plan:
-            print(f"    Bedrock plan: {plan['error']}" if "error" in plan else
-                  f"    Bedrock plan: recommend_proceeding={plan['recommend_proceeding']}: {plan['rationale']}")
+def _print_header(scenario: str, decider_source: str, bedrock_model: str | None, initial: dict) -> None:
+    bedrock = f"Bedrock {bedrock_model}" if bedrock_model else "no Bedrock"
+    print(f"\n=== {scenario}: {SCENARIOS[scenario]['title']}  (SIMULATED fleet; Decider: {decider_source}; {bedrock})")
+    print(f"initial: {initial}", flush=True)
+
+
+def _print_step(t: dict) -> None:
+    d = t["decision"]
+    if d is None:
+        print(f"\n[{t['step']}] {t['note']} -> tool {t['tool']}", flush=True)
+        return
+    raw = d["raw"] or {}
+    probs = ", ".join(f"{k}={v:.2f}" for k, v in sorted(raw.get("probabilities", {}).items(), key=lambda kv: -kv[1]))
+    print(f"\n[{t['step']}] excluded: {d['excluded'] or '-'}")
+    print(f"    Decider: choice={raw.get('choice')} conf={raw.get('confidence', 0):.2f} ({probs}) {raw.get('latency_ms')}ms")
+    print(f"    route={d['route']} ({d['reason']}) -> tool {t['tool']} [{t['tool_status']}]")
+    print(f"    result: {json.dumps(t['tool_result'])[:400]}")
+    plan = t["tool_result"].get("bedrock_plan") if isinstance(t["tool_result"], dict) else None
+    if plan:
+        print(f"    Bedrock plan: {plan['error']}" if "error" in plan else
+              f"    Bedrock plan: recommend_proceeding={plan['recommend_proceeding']}: {plan['rationale']}")
+    sys.stdout.flush()
+
+
+def _print_step_safely(t: dict) -> None:
+    """A malformed answer the router already handled must not stop the run before its trace is written."""
+    try:
+        _print_step(t)
+    except Exception as e:
+        print(f"\n[{t['step']}] could not print this step ({type(e).__name__}: {e}); the trace keeps it", flush=True)
+
+
+def _print_footer(r: dict) -> None:
+    o, last = r["outcome"], r["trace"][-1] if r["trace"] else None
+    gate = last and isinstance(last["tool_result"], dict) and last["tool_result"].get("gate")
+    if gate and gate["failed"] == ["human_approval"]:
+        print(f"\nproposal {gate['proposal_id']} is pending human approval (approve it in a terminal or the UI)")
     print(f"\noutcome: restored={o['restored']} profile={o['active_profile']} operator={o['serving_operator']} final={o['final_rates']}")
     if r["explanation"]:
         print(f"\nBedrock ({r['bedrock_model']}): {r['explanation']}")
+
+
+def _print(r: dict, decider_source: str) -> None:
+    _print_header(r["scenario"], decider_source, r["bedrock_model"], r["outcome"]["initial_rates"])
+    for t in r["trace"]:
+        _print_step(t)
+    _print_footer(r)
 
 
 def write_trace(path: str, res: dict) -> None:
@@ -322,9 +348,10 @@ if __name__ == "__main__":
         return reply.strip().lower() == "y"
 
     inc = Incident(a.scenario, approve=a.approve, decider=decider, use_bedrock=not a.no_bedrock)
-    finish(inc, ask)
+    _print_header(a.scenario, source, BEDROCK_MODEL if inc.use_bedrock else None, inc.initial)
+    finish(inc, ask, on_step=_print_step_safely)  # each step prints as it happens, so a prompt follows its evidence
     res = inc.result()
     res["decider_source"] = source
-    if a.out:  # before printing, so a presentation bug can never lose the trace
+    if a.out:  # before the summary, so a presentation bug can never lose the trace
         write_trace(a.out, res)
-    _print(res, source)
+    _print_footer(res)

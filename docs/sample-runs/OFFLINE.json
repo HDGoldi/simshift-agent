@@ -2,6 +2,7 @@
  "scenario": "OFFLINE",
  "title": "Remote devices: no heartbeat, no management path",
  "approved": true,
+ "human_answers": {},
  "bedrock_model": "eu.anthropic.claude-haiku-5-5",
  "trace": [
   {
@@ -44,8 +45,8 @@
      },
      "confidence": 0.0586,
      "model": "strands-decider-2B-qwen3.5-v1-2610",
-     "latency_ms": 409.61,
-     "client_latency_ms": 422.4
+     "latency_ms": 124.9,
+     "client_latency_ms": 137.2
     },
     "selected": "investigate_data_path",
     "route": "gather_evidence",
@@ -59,7 +60,7 @@
     "kind": "diagnostics_data_path",
     "result": {
      "network_side_attach_attempts_last_6h": 0,
-     "summary": "no attach attempts seen by any network; last known cells normal (power/field issue suspected)"
+     "summary": "no attach attempts seen by any network and no periodic registration updates since the last heartbeat (a PSM device still sends them when its periodic timer expires); last known cells normal (power/field issue suspected)"
     }
    },
    "rates_after": {
@@ -91,34 +92,24 @@
      "diagnostics": {
       "data_path": {
        "network_side_attach_attempts_last_6h": 0,
-       "summary": "no attach attempts seen by any network; last known cells normal (power/field issue suspected)"
+       "summary": "no attach attempts seen by any network and no periodic registration updates since the last heartbeat (a PSM device still sends them when its periodic timer expires); last known cells normal (power/field issue suspected)"
       }
      }
     },
     "eligible": {
-     "retry_connection": "Bounded backoff and re-attach on the current profile and operator; suits brief or improving disruptions",
      "escalate_or_wait": "Hold and hand off to a human with the collected evidence; suits cases no admissible remote action can fix"
     },
     "excluded": {
+     "retry_connection": "no attach attempts seen by any network; a network-side re-attach cannot reach devices that are not trying to attach",
      "try_allowed_operator": "active profile permits no other operator in coverage",
      "investigate_device": "devices unreachable; no modem logs retrievable",
      "evaluate_profile_change": "no management path to the IPA; OTA profile change impossible",
      "investigate_data_path": "evidence already collected"
     },
-    "raw": {
-     "choice": "escalate_or_wait",
-     "probabilities": {
-      "retry_connection": 0.3441,
-      "escalate_or_wait": 0.6559
-     },
-     "confidence": 0.3118,
-     "model": "strands-decider-2B-qwen3.5-v1-2610",
-     "latency_ms": 366.74,
-     "client_latency_ms": 368.0
-    },
+    "raw": null,
     "selected": "escalate_or_wait",
     "route": "fallback",
-    "reason": "confidence 0.31 < 0.5 and no read-only option left",
+    "reason": "only the fallback is admissible",
     "tool": "defer_or_escalate"
    },
    "tool": "defer_or_escalate",
@@ -128,7 +119,7 @@
     "evidence": {
      "data_path": {
       "network_side_attach_attempts_last_6h": 0,
-      "summary": "no attach attempts seen by any network; last known cells normal (power/field issue suspected)"
+      "summary": "no attach attempts seen by any network and no periodic registration updates since the last heartbeat (a PSM device still sends them when its periodic timer expires); last known cells normal (power/field issue suspected)"
      }
     }
    },
@@ -156,17 +147,32 @@
   },
   "active_profile": "profile_A",
   "serving_operator": "CL-NET-1",
-  "steps": 2
+  "steps": 2,
+  "simulated_minutes": 70,
+  "profile_changes": 0,
+  "forbidden_executions": 0,
+  "blocked_calls": 0
  },
- "explanation": "**Observed:** The agent queried APN session diagnostics. No network saw attach attempts in 6 hours, and last known cells looked normal. It ruled out trying another operator (the profile permits none in coverage), investigating the device (unreachable, no modem logs), and changing the profile (no management path to the IPA). It then chose to investigate the data path (0.37, nearly tied with escalate at 0.37). With that evidence, it escalated/waited (0.66). Outcome: not restored. Attach, data-session, app-ack, and heartbeat rates stayed at 0.0 across both steps, on profile_A with CL-NET-1.\n\n**Uncertain:** The \"power/field issue\" is only a suspicion in the summary, not a confirmed cause. The trace doesn't explain why no attach attempts reached the network. Decider confidence was low (0.06, then 0.31). It also doesn't show whether the escalation was acted on.",
+ "explanation": "**Observed:** Diagnostics showed zero attach attempts across all networks in 6 hours and no periodic registration updates since the last heartbeat. Last known cells looked normal. The agent chose to investigate the data path, but the decision was nearly tied with escalate/wait (0.37 vs 0.37), with confidence 0.06. Retry, other-operator, device investigation, and profile change were excluded for stated reasons. The agent then escalated. Outcome: not restored, all rates 0, profile_A on CL-NET-1, 70 simulated minutes, no profile changes.\n\n**Uncertain:** The root cause. A power or field issue is only suspected. Device logs were unreachable, so the trace does not explain why the device is silent or confirm its state.",
  "events": [
   {
    "seq": 1,
    "kind": "diagnostics_data_path",
    "result": {
     "network_side_attach_attempts_last_6h": 0,
-    "summary": "no attach attempts seen by any network; last known cells normal (power/field issue suspected)"
+    "summary": "no attach attempts seen by any network and no periodic registration updates since the last heartbeat (a PSM device still sends them when its periodic timer expires); last known cells normal (power/field issue suspected)"
+   }
+  },
+  {
+   "seq": 2,
+   "kind": "escalated",
+   "evidence": {
+    "data_path": {
+     "network_side_attach_attempts_last_6h": 0,
+     "summary": "no attach attempts seen by any network and no periodic registration updates since the last heartbeat (a PSM device still sends them when its periodic timer expires); last known cells normal (power/field issue suspected)"
+    }
    }
   }
- ]
+ ],
+ "decider_source": "live http://127.0.0.1:8099"
 }
