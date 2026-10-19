@@ -48,7 +48,8 @@ incident is finished deterministically and Bedrock is asked to rewrite its repor
 recorded. The two tools share a budget of 16 calls; past it they stop the agent loop. All six orchestrated runs in
 [`docs/sample-runs/orchestrated/`](sample-runs/orchestrated/) replay to the same tools through the plain loop.
 When the budget runs out, Bedrock's report is discarded and the result says why; a report is never returned for an
-incident state it did not see.
+incident state it did not see. The report is Bedrock's prose and is not checked against the trace; the trace and
+`outcome` in the same result are the record.
 
 ## Role boundaries
 
@@ -106,8 +107,9 @@ Decider's options beforehand:
 - the fleet owner authorizes switching;
 - a human approved.
 
-Independently of the gate, the virtual eIM refuses an enable command whose approval does not match the proposal, and
-one it cannot deliver because the management path is down. It does not repeat the gate's other checks. A test
+Independently of the gate, the virtual eIM refuses an enable command whose approval does not match the proposal, one
+for an eUICC that cannot enable profiles or a fleet whose owner forbids switching, and one it cannot deliver because
+the management path is down. It does not repeat the gate's evidence checks (reject cause, reselection, coverage). A test
 replaces the gate with one that always passes and checks that the eIM still refuses an unapproved switch.
 
 **A profile change that does not restore service is handed off.** If the gate blocks it for any reason other than a

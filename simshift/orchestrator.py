@@ -102,6 +102,7 @@ def orchestrate(scenario_id: str, approve: bool = False, decider=None, model=Non
         while not inc.done:
             inc.step()
     usage = agent.event_loop_metrics.accumulated_usage
+    # The report is Bedrock's prose and is not checked against the trace: trace and outcome are the record.
     return {**inc.result(explain=False), "mode": "orchestrated", "report": report, "report_after_fallback": rewritten,
             "bedrock_error": error,
             "bedrock_usage": {k: usage.get(k) for k in ("inputTokens", "outputTokens", "totalTokens")},
@@ -125,6 +126,7 @@ if __name__ == "__main__":
     if a.out:  # before printing, so a presentation bug can never lose the trace
         write_trace(a.out, res)
     _print(res, res["decider_source"])
-    print(f"\nBedrock report ({res['bedrock_model']}, {res['advance_calls']} advance_recovery calls, "
+    print(f"\nBedrock report, model-written and not checked against the trace; the outcome above is the record "
+          f"({res['bedrock_model']}, {res['advance_calls']} advance_recovery calls, "
           f"{res['bedrock_usage']}{', rewritten after a deterministic finish' if res['report_after_fallback'] else ''}):"
           f"\n{res['report'] or res['bedrock_error']}")

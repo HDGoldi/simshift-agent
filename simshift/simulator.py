@@ -283,12 +283,15 @@ class FleetTwin:
 
     def enable_profile(self, target: str, approval: str | None) -> dict:
         """Simulator-only. Independent of the policy gate, the virtual eIM compares the approval with its own id for
-        this proposal and refuses a mismatch, and refuses a command it cannot deliver. The approval doubles as the
+        this proposal, re-checks eUICC capability and owner authorization, and refuses a command it cannot deliver. The approval doubles as the
         idempotency key, so a repeated command returns the first result."""
         if approval in self.commands:
             return self.commands[approval]
         if approval != self.proposal_id(target):  # not cached: a later approved attempt must really execute
             return self._log("eim_enable_profile", ok=False, reason="no operator approval for this proposal; command not sent")
+        if not (self.s["euicc"]["supports_profile_enable"] and self.s["owner_allows_profile_switch"]):
+            return self._log("eim_enable_profile", ok=False,  # facts the eIM itself holds, checked even without the gate
+                             reason="eUICC cannot enable profiles or the owner forbids switching; command not sent")
         s = self.s
         if not self.management_reachable():
             res = self._log("eim_enable_profile", ok=False, reason="IPA unreachable; command not delivered")

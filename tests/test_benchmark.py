@@ -66,18 +66,27 @@ def derive(row: dict) -> dict:
     kinds = {e["kind"] for e in row["events"]}
     evidence = f"diagnostics_{EVIDENCE[fam]}" in kinds if fam in EVIDENCE else True
     changes = sum(e["kind"] == "eim_enable_profile" and e.get("ok") for e in row["events"])
-    return {"end": end, "evidence_collected": evidence,
-            "unnecessary_profile_changes": changes if fam != "profile" else max(0, changes - 1)}
+    unnecessary = changes if fam != "profile" else max(0, changes - 1)
+    preferred, acceptable, terminal = FAMILIES[fam]
+    first = row["trace"][0]["decision"]
+    correct = end == terminal and evidence
+    return {"end": end, "evidence_collected": evidence, "unnecessary_profile_changes": unnecessary,
+            "correct_end": correct, "correct_without_collateral": correct and unnecessary == 0,
+            "first_choice_preferred": (first["raw"] or {}).get("choice") == preferred,
+            "first_action_acceptable": first["selected"] in acceptable, "steps": len(row["trace"])}
 
 
 @pytest.mark.parametrize("path", PUBLISHED)
 def test_published_benchmark_is_reproducible_from_its_records(path, monkeypatch):
+    """Every scored field is re-derived from the stored trace and events, so editing a score (and its summary)
+    without editing the trace fails here."""
     from simshift.validate import problems
     d = json.load(open(path))
     for chooser, rows in d["results"].items():
         assert summarize(rows) == d["summary"][chooser], chooser  # headline numbers come from the stored rows
         for row in rows:
-            assert {k: row[k] for k in ("end", "evidence_collected", "unnecessary_profile_changes")} == derive(row)
+            derived = derive(row)
+            assert {k: row[k] for k in derived} == derived, (chooser, row["incident"])
             fam, seed = row["incident"].split("-")[1], int(row["incident"].split("-")[2])
             monkeypatch.setitem(SCENARIOS, row["incident"], make(fam, seed))  # regenerate: seeds are deterministic
             run = {"scenario": row["incident"], "trace": row["trace"], "events": row["events"], "outcome": row["outcome"]}

@@ -12,7 +12,7 @@ Model `StrandsAgents/strands-decider-2B-qwen3.5-v1-2610`, repo `strands-labs/str
 |---|---|---|---|
 | MLX (in-process) | Apple M4 Max laptop | median 401 ms (5 calls, 4 options) | 4.8 GB |
 | MLX (HTTP server), first agent runs | same | 367–517 ms per decision | — |
-| MLX (HTTP server), later runs | same | median 122 ms (101–145, 12 decisions in the orchestrated runs); p50 92 ms, p95 118 ms (135 decisions in the benchmark) | — |
+| MLX (HTTP server), later runs | same | median 122 ms (108–145, 12 decisions in the orchestrated runs); p50 92 ms, p95 118 ms (135 decisions in the benchmark) | — |
 | torch CPU (in-process) | same laptop, CPU only | about 1.0 s | 12.1 GB (fp32) |
 
 The server's `latency_ms` field is what is reported here; the benchmark table further down reports client-side wall
@@ -52,12 +52,12 @@ identical to the table above.
 
 | Scenario | Steps (`advance_recovery` calls) | Decider choices (p, conf) → route | Outcome | Simulated minutes | Bedrock tokens in / out |
 |---|---|---|---|---|---|
-| BR_PROFILE | 3 | as above | restored, 1 profile change | 55 | 8,663 / 1,114 |
-| DE_OPERATOR | 2 | as above | restored, no eSIM change | 20 | 5,025 / 745 |
-| JP_INGEST | 3 | as above | escalated with the ingestion finding | 85 | 7,537 / 814 |
-| OFFLINE | 2 | as above | escalated, no OTA command | 70 | 5,030 / 654 |
-| FW_LOOP | 3 | retry_connection (0.54, 0.39) → gather_evidence: modem diagnostics; escalate_or_wait (0.62, 0.25) → gather_evidence: data-path diagnostics; only the fallback left | escalated with the reset-loop finding | 85 | 7,511 / 826 |
-| TRANSIENT | 1 | retry_connection (0.84, 0.79) → act | restored by one retry | 5 | 3,171 / 528 |
+| BR_PROFILE | 3 | as above | restored, 1 profile change | 55 | 8,708 / 1,049 |
+| DE_OPERATOR | 2 | as above | restored, no eSIM change | 20 | 4,986 / 713 |
+| JP_INGEST | 3 | as above | escalated with the ingestion finding | 85 | 7,537 / 748 |
+| OFFLINE | 2 | as above | escalated, no OTA command | 70 | 5,072 / 613 |
+| FW_LOOP | 3 | retry_connection (0.54, 0.39) → gather_evidence: modem diagnostics; escalate_or_wait (0.62, 0.25) → gather_evidence: data-path diagnostics; only the fallback left | escalated with the reset-loop finding | 85 | 7,511 / 769 |
+| TRANSIENT | 1 | retry_connection (0.84, 0.79) → act | restored by one retry | 5 | 3,171 / 529 |
 
 Bedrock token counts are the Strands `accumulated_usage` of the orchestrating agent. The BR_PROFILE run also made one
 plan-review call inside the profile-change tool, which is not included in that count.

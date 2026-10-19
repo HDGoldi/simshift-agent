@@ -65,7 +65,8 @@ that is bound to that exact proposal. Every attempt records its eUICC transition
 In orchestrator mode ([`simshift/orchestrator.py`](simshift/orchestrator.py)) a Strands agent on Bedrock drives the
 incident. It sees exactly two tools, `get_incident_state` and `advance_recovery`, and **neither takes an argument**.
 Each `advance_recovery` call runs one policy → Decider → gated-tool step. Bedrock decides when to look, when to keep
-going and how to report; it has no way to name a recovery tool, skip the gate or approve a change. Tests drive the
+going and how to report; it has no way to name a recovery tool, skip the gate or approve a change. Its report is
+model-written prose; the trace and outcome next to it are the record. Tests drive the
 real Strands event loop with a scripted model to prove it ([`tests/test_orchestrator.py`](tests/test_orchestrator.py)).
 
 ## Observed runs (real Decider + Bedrock, synthetic fleet)
@@ -109,7 +110,7 @@ Decider ran on a laptop GPU and Bedrock in eu-central-1, and each chooser ran on
 ```bash
 git clone https://github.com/HDGoldi/simshift-agent && cd simshift-agent
 make install                     # or: uv venv && uv pip install -e . pytest
-make test                        # 93 tests + trace validation; no Decider server or AWS needed
+make test                        # 100 tests + trace validation; no Decider server or AWS needed
 make ui                          # Recovery Decision Inspector on recorded real Decider answers: http://127.0.0.1:8090
 make replay                      # re-run all six recorded traces against the current code
 ```
@@ -147,8 +148,8 @@ twin, and Bedrock's plan review and explanation.
 
 ## Tests
 
-`make test` runs 93 tests and validates every published trace and the benchmark file. Without AWS credentials and a
-Decider server, 92 pass and the real-Decider test skips (set `SIMSHIFT_REQUIRE_DECIDER=1` to make that a failure).
+`make test` runs 100 tests and validates every published trace and the benchmark file. Without AWS credentials and a
+Decider server, 99 pass and the real-Decider test skips (set `SIMSHIFT_REQUIRE_DECIDER=1` to make that a failure).
 Bedrock is never called in tests. The acceptance properties covered:
 - Decider's choice controls which Strands tool runs; Bedrock in orchestrator mode cannot change it.
 - Excluded options are never offered and are denied on any call path; an independent audit counts violations.

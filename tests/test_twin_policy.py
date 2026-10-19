@@ -1,3 +1,4 @@
+import pytest
 import json
 
 from simshift.policy import counterfactual, exclusions, guarded_profile_transition, proposal_id
@@ -200,3 +201,14 @@ def test_eim_still_refuses_if_the_gate_were_broken(monkeypatch):
     out = policy.guarded_profile_transition(twin, "profile_B", None)  # no approval at all
     assert not out["executed"] and out["transition"][-1] == "NOT_DELIVERED"
     assert twin.s["active_profile"] == "profile_A" and "no operator approval" in out["eim"]["reason"]
+
+
+@pytest.mark.parametrize("field", ["euicc.supports_profile_enable", "owner_allows_profile_switch"])
+def test_eim_enforces_capability_and_owner_even_on_a_direct_call(field):
+    twin = FleetTwin("BR_PROFILE")
+    if "." in field:
+        twin.s["euicc"]["supports_profile_enable"] = False
+    else:
+        twin.s[field] = False
+    res = twin.enable_profile("profile_B", twin.proposal_id("profile_B"))  # bypasses the gate entirely
+    assert not res["ok"] and twin.s["active_profile"] == "profile_A"
