@@ -96,12 +96,8 @@ What is modelled, what is simplified and what is left out, in telecom terms, is 
   registration, data session **and** application telemetry are verified. Delivery and execution are one simulated
   step. A failed verification is rolled back by the eIM re-enabling the previous profile, which the original approval
   covers. If the new profile cannot connect and the result cannot be reported, the device rolls back on its own (this
-  stands in for SGP.32's IPA-triggered rollback). The virtual eIM requires a string target naming an installed,
-  inactive profile before it attempts delivery. Exact duplicate commands are served from the approval-keyed cache
-  first—even when the successful target is now active—so they return the original result without another event or
-  state change. New invalid-target and other command-not-sent refusals remain uncached audit events; under the
-  simulation's existing event accounting, each `eim_enable_profile` refusal still represents 30 simulated minutes.
-  No profile download, no cryptography, no certified SGP.32 flow.
+  stands in for SGP.32's IPA-triggered rollback). Commands are idempotent per attempt. No profile download, no
+  cryptography, no certified SGP.32 flow.
 - **Deterministic.** There is no randomness; cloning a twin and replaying the same actions gives identical state and events.
 
 ## Keeping the answer away from the models
@@ -126,13 +122,12 @@ Decider's options beforehand:
 - the fleet owner authorizes switching;
 - a human approved.
 
-Independently of the gate, the virtual eIM serves an exact cached command duplicate before revalidating its target.
-For an uncached command, it rejects a non-string target and refuses a target that is not an installed profile or is
-already active before checking the proposal, capability, owner authorization, or reachability. It also refuses an
-enable command whose approval does not match the proposal, one for an eUICC that cannot enable profiles or a fleet
-whose owner forbids switching, and one it cannot deliver because the management path is down. It does not repeat the
-gate's evidence checks (reject cause, reselection, coverage). A test replaces the gate with one that always passes and
-checks that the eIM still refuses an unapproved switch.
+Independently of the gate, the virtual eIM refuses an enable command whose target is not an installed, inactive
+profile, whose approval does not match the proposal, for an eUICC that cannot enable profiles or a fleet whose owner
+forbids switching, and one it cannot deliver because the management path is down. A command that reuses an approval
+returns the first result for that approval, whatever its target. It does not repeat the gate's evidence checks (reject
+cause, reselection, coverage). A test replaces the gate with one that always passes and checks that the eIM still
+refuses an unapproved switch.
 
 **A profile change that does not restore service is handed off.** If the gate blocks it for any reason other than a
 pending approval, the eIM cannot deliver it, verification fails and it is rolled back, rollback itself fails, or the

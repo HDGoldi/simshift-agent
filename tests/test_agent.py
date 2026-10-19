@@ -48,8 +48,6 @@ def test_direct_tool_model_is_a_stateless_failing_async_adapter(method):
     with pytest.raises(RuntimeError) as error:
         asyncio.run(_consume(events))
     assert str(error.value) == "inference is disabled for direct-tool-only incidents"
-    assert not any(secret in str(error.value) for secret in
-                   ("secret-region", "secret-credentials", "secret-prompt", "secret-scenario", "secret-future"))
 
 
 def test_offline_incident_skips_bedrock_factory_and_runs_a_direct_tool(monkeypatch):
@@ -62,7 +60,7 @@ def test_offline_incident_skips_bedrock_factory_and_runs_a_direct_tool(monkeypat
     assert inc.llm.get_config() == {}
 
 
-def test_enabled_incident_uses_the_cached_model_factory_result(monkeypatch):
+def test_bedrock_incident_uses_the_bedrock_model_factory(monkeypatch):
     import simshift.agent as ag
 
     sentinel, passed_to_tools = ag._DirectToolModel(), []

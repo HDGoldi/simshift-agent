@@ -23,5 +23,6 @@ README "Live" section) and, for Bedrock, `AWS_PROFILE=<your-profile>`.
 
 ## Gotchas
 
-- Live Bedrock flows require a valid AWS profile and region configuration.
+- `--no-bedrock` runs, replay and validate ignore `AWS_PROFILE`. `make test` still needs it unset or valid: the pattern
+  tests and the Bedrock-mocked agent tests construct a `BedrockModel`.
 - Benchmark runs take ~20-40 min with both Bedrock choosers; run them in the background.

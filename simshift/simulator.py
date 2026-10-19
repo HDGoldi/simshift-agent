@@ -287,8 +287,8 @@ class FleetTwin:
 
     def enable_profile(self, target: str, approval: str | None) -> dict:
         """Simulator-only. Independent of the policy gate, the virtual eIM compares the approval with its own id for
-        this proposal, re-checks eUICC capability and owner authorization, and refuses a command it cannot deliver. The approval doubles as the
-        idempotency key, so a repeated command returns the first result."""
+        this proposal, re-checks the target, eUICC capability and owner authorization, and refuses a command it cannot deliver.
+        The approval doubles as the idempotency key, so a repeated approval returns the first result whatever the target."""
         if approval in self.commands:
             return self.commands[approval]
         if not isinstance(target, str):
