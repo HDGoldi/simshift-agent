@@ -23,5 +23,5 @@ README "Live" section) and, for Bedrock, `AWS_PROFILE=<your-profile>`.
 
 ## Gotchas
 
-- An invalid `AWS_PROFILE` name crashes even `--no-bedrock` runs: the inner Strands agent always builds a BedrockModel.
+- Live Bedrock flows require a valid AWS profile and region configuration.
 - Benchmark runs take ~20-40 min with both Bedrock choosers; run them in the background.

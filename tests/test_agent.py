@@ -1,5 +1,8 @@
+import asyncio
 import json
 import os
+import subprocess
+import sys
 import urllib.request
 
 import pytest
@@ -20,6 +23,59 @@ class ScriptedDecider:
         c = self.choices.pop(0) if self.choices else "escalate_or_wait"
         assert c in options, f"test scripted a non-admissible choice {c}"
         return {"choice": c, "probabilities": {o: float(o == c) for o in options}, "confidence": 1.0}
+
+
+async def _consume(events):
+    async for _ in events:
+        pass
+
+
+@pytest.mark.parametrize("method", ["stream", "structured_output"])
+def test_direct_tool_model_is_a_stateless_failing_async_adapter(method):
+    from simshift.agent import ProfilePlan, _DirectToolModel
+
+    model = _DirectToolModel()
+    model.update_config(region_name="secret-region", credentials="secret-credentials")
+    assert model.get_config() == {}
+    if method == "stream":
+        events = model.stream([], tool_specs=[], system_prompt="secret-prompt", tool_choice={"auto": {}},
+                              system_prompt_content=[], invocation_state={"scenario": "secret-scenario"},
+                              cancel_signal=None, agent_metadata=None, future_sdk_kwarg="secret-future")
+    else:
+        events = model.structured_output(ProfilePlan, [], system_prompt="secret-prompt",
+                                         invocation_state={"scenario": "secret-scenario"},
+                                         future_sdk_kwarg="secret-future")
+    with pytest.raises(RuntimeError) as error:
+        asyncio.run(_consume(events))
+    assert str(error.value) == "inference is disabled for direct-tool-only incidents"
+    assert not any(secret in str(error.value) for secret in
+                   ("secret-region", "secret-credentials", "secret-prompt", "secret-scenario", "secret-future"))
+
+
+def test_offline_incident_skips_bedrock_factory_and_runs_a_direct_tool(monkeypatch):
+    import simshift.agent as ag
+
+    monkeypatch.setattr(ag, "bedrock_model", lambda: pytest.fail("offline incident called bedrock_model"))
+    inc = ag.Incident("BR_PROFILE", decider=ScriptedDecider(["investigate_device"]), use_bedrock=False)
+    step = inc.step()
+    assert step["tool"] == TOOLS["investigate_device"] and step["tool_status"] == "success"
+    assert inc.llm.get_config() == {}
+
+
+def test_enabled_incident_uses_the_cached_model_factory_result(monkeypatch):
+    import simshift.agent as ag
+
+    sentinel, passed_to_tools = ag._DirectToolModel(), []
+    real_build_tools = ag.build_tools
+
+    def capture_tools(twin, approver, llm):
+        passed_to_tools.append(llm)
+        return real_build_tools(twin, approver, llm)
+
+    monkeypatch.setattr(ag, "bedrock_model", lambda: sentinel)
+    monkeypatch.setattr(ag, "build_tools", capture_tools)
+    inc = ag.Incident("TRANSIENT", decider=ScriptedDecider(["retry_connection"]), use_bedrock=True)
+    assert inc.llm is sentinel and passed_to_tools == [sentinel]
 
 
 def test_decider_controls_tool():
@@ -122,6 +178,44 @@ def test_off_menu_choice_never_reaches_the_eim():
 
 
 SAMPLE_RUNS = os.path.join(os.path.dirname(__file__), "..", "docs", "sample-runs")
+
+
+def test_all_offline_surfaces_ignore_a_hostile_aws_profile(monkeypatch):
+    import simshift.agent as ag
+    from simshift.benchmark import RandomChooser, RulesChooser, make, run_one
+    from simshift.validate import problems
+    from simshift.web import App
+
+    monkeypatch.setenv("AWS_PROFILE", "simshift-profile-that-does-not-exist")
+    monkeypatch.setattr(ag, "bedrock_model", lambda: pytest.fail("offline surface called bedrock_model"))
+
+    recording = json.load(open(os.path.join(SAMPLE_RUNS, "TRANSIENT.json")))
+    assert problems(recording) == []
+
+    sid = "generated-hostile-profile-transient"
+    monkeypatch.setitem(SCENARIOS, sid, make("transient", 9007))
+    for chooser in (RulesChooser(), RandomChooser(7)):
+        row = run_one(sid, "transient", chooser)
+        assert row["incident"] == sid and row["trace"]
+
+    app = App("http://127.0.0.1:1", replay_dir=os.path.join(SAMPLE_RUNS, "orchestrated"))
+    snapshot = app.create("TRANSIENT")
+    while not snapshot["done"]:
+        snapshot = app.act(snapshot["id"], "step", {})
+    assert snapshot["outcome"]["restored"]
+
+
+def test_no_bedrock_cli_replay_ignores_a_hostile_aws_profile():
+    command = [sys.executable, "-m", "simshift.agent", "TRANSIENT", "--approve", "--no-bedrock",
+               "--replay", "docs/sample-runs/TRANSIENT.json"]
+    env = {**os.environ, "AWS_PROFILE": "simshift-profile-that-does-not-exist",
+           "DECIDER_URL": "http://127.0.0.1:1"}
+    completed = subprocess.run(command, cwd=os.path.dirname(os.path.dirname(__file__)), env=env,
+                               capture_output=True, text=True, timeout=30)
+    output = completed.stdout + completed.stderr
+    assert completed.returncode == 0, output
+    assert "no Bedrock" in completed.stdout and "restored=True" in completed.stdout
+    assert "ProfileNotFound" not in output
 
 
 @pytest.mark.parametrize("name", sorted(f for d in ("", "orchestrated") for f in

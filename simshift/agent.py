@@ -19,7 +19,7 @@ from typing import Callable
 from pydantic import BaseModel
 from strands import Agent, tool
 from strands.hooks import AfterToolCallEvent, BeforeToolCallEvent
-from strands.models import BedrockModel
+from strands.models import BedrockModel, Model
 
 from patterns.capability_aware_router.router import CapabilityAwareRouter, DeciderClient, ReplayDecider
 
@@ -48,19 +48,39 @@ class ProfilePlan(BaseModel):
     risks: list[str]
 
 
+class _DirectToolModel(Model):
+    """Provider-neutral model for incidents that only invoke tools directly."""
+
+    def get_config(self) -> dict:
+        return {}
+
+    def update_config(self, **model_config) -> None:
+        pass
+
+    async def stream(self, messages, tool_specs=None, system_prompt=None, **kwargs):
+        if False:
+            yield {}
+        raise RuntimeError("inference is disabled for direct-tool-only incidents")
+
+    async def structured_output(self, output_model, prompt, system_prompt=None, **kwargs):
+        if False:
+            yield {}
+        raise RuntimeError("inference is disabled for direct-tool-only incidents")
+
+
 @functools.cache
 def bedrock_model() -> BedrockModel:
     """One Bedrock client per process; creating the boto3 session per incident cost about 0.1 s each."""
     return BedrockModel(model_id=BEDROCK_MODEL, region_name=REGION, max_tokens=2048)
 
 
-def _bedrock(llm: BedrockModel, prompt: str, schema=None):
+def _bedrock(llm: Model, prompt: str, schema=None):
     agent = Agent(model=llm, tools=[], callback_handler=None)
     res = agent(prompt, structured_output_model=schema) if schema else agent(prompt)
     return res.structured_output.model_dump() if schema else str(res).strip()
 
 
-def build_tools(twin: FleetTwin, approver: Callable[[str], bool], llm: BedrockModel | None) -> list:
+def build_tools(twin: FleetTwin, approver: Callable[[str], bool], llm: Model | None) -> list:
     """The six routed tools. `approver(proposal_id)` says whether a human approved that exact proposal."""
     plans: dict[str, dict | None] = {}  # one Bedrock review per proposal, even if it is re-submitted after approval
 
@@ -148,7 +168,7 @@ class Incident:
         self.scenario_id, self.pre_approved, self.use_bedrock = scenario_id, approve, use_bedrock
         self.twin = twin = FleetTwin(scenario_id)
         self.router = make_router(decider or DeciderClient(os.environ.get("DECIDER_URL", "http://127.0.0.1:8099")))
-        self.llm = bedrock_model()
+        self.llm: Model = bedrock_model() if use_bedrock else _DirectToolModel()
         self.approved: set[str] = set()  # proposal ids a human approved during the session
         self.answers: dict[str, bool] = {}  # every human answer: proposal id -> approved?
         self.agent = Agent(model=self.llm, tools=build_tools(twin, lambda pid: approve or pid in self.approved,
