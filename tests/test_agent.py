@@ -216,14 +216,17 @@ def test_no_bedrock_cli_replay_ignores_a_hostile_aws_profile():
     assert "ProfileNotFound" not in output
 
 
-@pytest.mark.parametrize("name", sorted(f for d in ("", "orchestrated") for f in
+@pytest.mark.parametrize("name", sorted(f for d in ("", "orchestrated", "aws") for f in
                                          (os.path.join(d, x) for x in os.listdir(os.path.join(SAMPLE_RUNS, d)))
                                          if f.endswith(".json")))
 def test_published_runs_replay_identically(name):
     from patterns.capability_aware_router.router import ReplayDecider
+    from simshift.agent import Incident, finish, recorded_answers
     rec = json.load(open(os.path.join(SAMPLE_RUNS, name)))
     replay = ReplayDecider([t["decision"] for t in rec["trace"]])
-    r = run(rec["scenario"], approve=rec["approved"], use_bedrock=False, decider=replay)
+    inc = Incident(rec["scenario"], approve=rec["approved"], decider=replay, use_bedrock=False)
+    finish(inc, recorded_answers(rec))  # an approval given as a separate human answer replays as that answer
+    r = inc.result()
     reasons = [t["decision"] and t["decision"]["reason"] for t in r["trace"]]
     assert reasons == [t["decision"] and t["decision"]["reason"] for t in rec["trace"]] and not replay.pending
     assert [t["tool"] for t in r["trace"]] == [t["tool"] for t in rec["trace"]]

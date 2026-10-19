@@ -1,0 +1,305 @@
+{
+ "scenario": "JP_INGEST",
+ "title": "Japan: cellular healthy, application ACKs failing",
+ "approved": false,
+ "human_answers": {},
+ "bedrock_model": "eu.anthropic.claude-haiku-5-5",
+ "trace": [
+  {
+   "step": 1,
+   "decision": {
+    "question": "Given the cellular connectivity symptoms, diagnostic evidence so far, and only these admissible tools, which next tool is most useful for safely advancing service restoration? Do not assume an unverified recovery path works.",
+    "state": {
+     "incident": "Telemetry not arriving",
+     "country": "JP",
+     "affected_devices": 11600,
+     "attach_success_rate": 0.997,
+     "data_session_rate": 0.99,
+     "app_ack_rate": 0.02,
+     "heartbeat_rate": 0.99,
+     "serving_operator": "JP-NET-1",
+     "active_profile": "profile_A",
+     "other_operator_allowed_on_active_profile": false,
+     "alternative_profile_installed": true,
+     "management_path_reachable": true,
+     "recent_firmware_change": false,
+     "attempted_retries": 0,
+     "diagnostics": {}
+    },
+    "eligible": {
+     "investigate_device": "Read-only: pull modem and firmware diagnostics from the devices",
+     "investigate_data_path": "Read-only: check network-side data sessions, APN and application ingestion; suits devices that register but whose telemetry fails",
+     "escalate_or_wait": "Hold and hand off to a human with the collected evidence; suits cases no admissible remote action can fix"
+    },
+    "excluded": {
+     "retry_connection": "registration already healthy; re-attaching cannot help",
+     "try_allowed_operator": "active profile permits no other operator in coverage",
+     "evaluate_profile_change": "active profile registers normally (99.7%); a profile switch has no causal path to recovery"
+    },
+    "raw": {
+     "choice": "investigate_data_path",
+     "probabilities": {
+      "investigate_device": 0.114,
+      "investigate_data_path": 0.805,
+      "escalate_or_wait": 0.081
+     },
+     "confidence": 0.7075,
+     "model": "strands-decider-2B-qwen3.5-v1-2610",
+     "latency_ms": 6171.27,
+     "client_latency_ms": 6186.1
+    },
+    "selected": "investigate_data_path",
+    "route": "act",
+    "reason": "confidence 0.71 >= 0.5",
+    "tool": "query_apn_session_app_diagnostics"
+   },
+   "tool": "query_apn_session_app_diagnostics",
+   "tool_status": "success",
+   "tool_result": {
+    "seq": 1,
+    "kind": "diagnostics_data_path",
+    "result": {
+     "pdn_sessions": "established",
+     "apn": "ok",
+     "ingest_http_5xx_rate": 0.98,
+     "summary": "cellular + APN healthy; ingestion endpoint rejecting payloads since deploy ingest-v2.14"
+    }
+   },
+   "rates_after": {
+    "attach_success_rate": 0.997,
+    "data_session_rate": 0.99,
+    "app_ack_rate": 0.02,
+    "heartbeat_rate": 0.99
+   }
+  },
+  {
+   "step": 2,
+   "decision": {
+    "question": "Given the cellular connectivity symptoms, diagnostic evidence so far, and only these admissible tools, which next tool is most useful for safely advancing service restoration? Do not assume an unverified recovery path works.",
+    "state": {
+     "incident": "Telemetry not arriving",
+     "country": "JP",
+     "affected_devices": 11600,
+     "attach_success_rate": 0.997,
+     "data_session_rate": 0.99,
+     "app_ack_rate": 0.02,
+     "heartbeat_rate": 0.99,
+     "serving_operator": "JP-NET-1",
+     "active_profile": "profile_A",
+     "other_operator_allowed_on_active_profile": false,
+     "alternative_profile_installed": true,
+     "management_path_reachable": true,
+     "recent_firmware_change": false,
+     "attempted_retries": 0,
+     "diagnostics": {
+      "data_path": {
+       "pdn_sessions": "established",
+       "apn": "ok",
+       "ingest_http_5xx_rate": 0.98,
+       "summary": "cellular + APN healthy; ingestion endpoint rejecting payloads since deploy ingest-v2.14"
+      }
+     }
+    },
+    "eligible": {
+     "investigate_device": "Read-only: pull modem and firmware diagnostics from the devices",
+     "escalate_or_wait": "Hold and hand off to a human with the collected evidence; suits cases no admissible remote action can fix"
+    },
+    "excluded": {
+     "retry_connection": "registration already healthy; re-attaching cannot help",
+     "try_allowed_operator": "active profile permits no other operator in coverage",
+     "evaluate_profile_change": "active profile registers normally (99.7%); a profile switch has no causal path to recovery",
+     "investigate_data_path": "evidence already collected"
+    },
+    "raw": {
+     "choice": "escalate_or_wait",
+     "probabilities": {
+      "investigate_device": 0.4592,
+      "escalate_or_wait": 0.5408
+     },
+     "confidence": 0.0817,
+     "model": "strands-decider-2B-qwen3.5-v1-2610",
+     "latency_ms": 6971.74,
+     "client_latency_ms": 6976.1
+    },
+    "selected": "investigate_device",
+    "route": "gather_evidence",
+    "reason": "confidence 0.08 < 0.5: most probable read-only option",
+    "tool": "query_firmware_modem_diagnostics"
+   },
+   "tool": "query_firmware_modem_diagnostics",
+   "tool_status": "success",
+   "tool_result": {
+    "seq": 2,
+    "kind": "diagnostics_device",
+    "result": {
+     "available": true,
+     "firmware_uniform": true,
+     "modem_resets_per_day": 0.1,
+     "reject_cause": null,
+     "summary": "modem healthy"
+    }
+   },
+   "rates_after": {
+    "attach_success_rate": 0.997,
+    "data_session_rate": 0.99,
+    "app_ack_rate": 0.02,
+    "heartbeat_rate": 0.99
+   }
+  },
+  {
+   "step": 3,
+   "decision": {
+    "question": "Given the cellular connectivity symptoms, diagnostic evidence so far, and only these admissible tools, which next tool is most useful for safely advancing service restoration? Do not assume an unverified recovery path works.",
+    "state": {
+     "incident": "Telemetry not arriving",
+     "country": "JP",
+     "affected_devices": 11600,
+     "attach_success_rate": 0.997,
+     "data_session_rate": 0.99,
+     "app_ack_rate": 0.02,
+     "heartbeat_rate": 0.99,
+     "serving_operator": "JP-NET-1",
+     "active_profile": "profile_A",
+     "other_operator_allowed_on_active_profile": false,
+     "alternative_profile_installed": true,
+     "management_path_reachable": true,
+     "recent_firmware_change": false,
+     "attempted_retries": 0,
+     "diagnostics": {
+      "data_path": {
+       "pdn_sessions": "established",
+       "apn": "ok",
+       "ingest_http_5xx_rate": 0.98,
+       "summary": "cellular + APN healthy; ingestion endpoint rejecting payloads since deploy ingest-v2.14"
+      },
+      "device": {
+       "available": true,
+       "firmware_uniform": true,
+       "modem_resets_per_day": 0.1,
+       "reject_cause": null,
+       "summary": "modem healthy"
+      }
+     }
+    },
+    "eligible": {
+     "escalate_or_wait": "Hold and hand off to a human with the collected evidence; suits cases no admissible remote action can fix"
+    },
+    "excluded": {
+     "retry_connection": "registration already healthy; re-attaching cannot help",
+     "try_allowed_operator": "active profile permits no other operator in coverage",
+     "evaluate_profile_change": "active profile registers normally (99.7%); a profile switch has no causal path to recovery",
+     "investigate_device": "evidence already collected",
+     "investigate_data_path": "evidence already collected"
+    },
+    "raw": null,
+    "selected": "escalate_or_wait",
+    "route": "fallback",
+    "reason": "only the fallback is admissible",
+    "tool": "defer_or_escalate"
+   },
+   "tool": "defer_or_escalate",
+   "tool_status": "success",
+   "tool_result": {
+    "escalated": true,
+    "evidence": {
+     "data_path": {
+      "pdn_sessions": "established",
+      "apn": "ok",
+      "ingest_http_5xx_rate": 0.98,
+      "summary": "cellular + APN healthy; ingestion endpoint rejecting payloads since deploy ingest-v2.14"
+     },
+     "device": {
+      "available": true,
+      "firmware_uniform": true,
+      "modem_resets_per_day": 0.1,
+      "reject_cause": null,
+      "summary": "modem healthy"
+     }
+    }
+   },
+   "rates_after": {
+    "attach_success_rate": 0.997,
+    "data_session_rate": 0.99,
+    "app_ack_rate": 0.02,
+    "heartbeat_rate": 0.99
+   }
+  }
+ ],
+ "outcome": {
+  "restored": false,
+  "initial_rates": {
+   "attach_success_rate": 0.997,
+   "data_session_rate": 0.99,
+   "app_ack_rate": 0.02,
+   "heartbeat_rate": 0.99
+  },
+  "final_rates": {
+   "attach_success_rate": 0.997,
+   "data_session_rate": 0.99,
+   "app_ack_rate": 0.02,
+   "heartbeat_rate": 0.99
+  },
+  "active_profile": "profile_A",
+  "serving_operator": "JP-NET-1",
+  "steps": 3,
+  "simulated_minutes": 85,
+  "profile_changes": 0,
+  "forbidden_executions": 0,
+  "blocked_calls": 0
+ },
+ "explanation": null,
+ "events": [
+  {
+   "seq": 1,
+   "kind": "diagnostics_data_path",
+   "result": {
+    "pdn_sessions": "established",
+    "apn": "ok",
+    "ingest_http_5xx_rate": 0.98,
+    "summary": "cellular + APN healthy; ingestion endpoint rejecting payloads since deploy ingest-v2.14"
+   }
+  },
+  {
+   "seq": 2,
+   "kind": "diagnostics_device",
+   "result": {
+    "available": true,
+    "firmware_uniform": true,
+    "modem_resets_per_day": 0.1,
+    "reject_cause": null,
+    "summary": "modem healthy"
+   }
+  },
+  {
+   "seq": 3,
+   "kind": "escalated",
+   "evidence": {
+    "data_path": {
+     "pdn_sessions": "established",
+     "apn": "ok",
+     "ingest_http_5xx_rate": 0.98,
+     "summary": "cellular + APN healthy; ingestion endpoint rejecting payloads since deploy ingest-v2.14"
+    },
+    "device": {
+     "available": true,
+     "firmware_uniform": true,
+     "modem_resets_per_day": 0.1,
+     "reject_cause": null,
+     "summary": "modem healthy"
+    }
+   }
+  }
+ ],
+ "mode": "orchestrated",
+ "report": "**What happened**\nIncident \"Telemetry not arriving\" in JP (simulated), 11,600 devices, serving operator JP-NET-1. Registration was healthy (attach 0.997, data session 0.99, heartbeat 0.99), but app_ack_rate was 0.02. This is a simulated environment.\n\n**Decisions**\n- **Step 1:** Policy removed retry_connection, try_allowed_operator, and evaluate_profile_change. Choice: investigate_data_path (confidence 0.71, route: act). Result: PDN sessions and APN were OK, but the ingestion endpoint was rejecting payloads (ingest_http_5xx_rate 0.98) since deploy ingest-v2.14.\n- **Step 2:** Policy also removed investigate_data_path. Choice: escalate_or_wait (confidence 0.08, route: gather_evidence). Result: modem healthy, firmware uniform, reject_cause null.\n- **Step 3:** Only the fallback was admissible. defer_or_escalate ran and escalated the incident.\n\n**Outcome**\nNot restored. After the last step, app_ack_rate was still 0.02. Attach, data session, and heartbeat stayed at 0.997, 0.99, and 0.99. No profile change was made, and none was needed or approved. The profile is still profile_A.\n\n**Next**\nThe fault is on the ingestion side: endpoint ingest-v2.14 is returning 5xx errors. An engineer should review or roll back that deploy. I did not verify the ingestion service directly, so this rests on the diagnostic summary alone. Recheck app_ack_rate after the fix.",
+ "report_after_fallback": false,
+ "bedrock_error": null,
+ "bedrock_usage": {
+  "inputTokens": 7660,
+  "outputTokens": 732,
+  "totalTokens": 8392
+ },
+ "advance_calls": 3,
+ "pending_approval": null,
+ "decider_source": "live http://decider.simshift.local:8099 (ECS Fargate)"
+}

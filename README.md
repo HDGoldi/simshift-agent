@@ -87,6 +87,12 @@ real Strands event loop with a scripted model to prove it ([`tests/test_orchestr
 Single runs on 2026-10-19. Traces: [docs/sample-runs/orchestrated/](docs/sample-runs/orchestrated/) (Bedrock runs the loop)
 and [docs/sample-runs/](docs/sample-runs/) (the plain Python loop), all six scenarios each. Decider's answers were
 identical in both. Every trace replays and validates in CI.
+
+**On AWS.** The same six scenarios also ran on the deployed system: the orchestrator on Bedrock AgentCore Runtime, and
+Decider on a private ECS Fargate CPU task ([docs/sample-runs/aws/](docs/sample-runs/aws/),
+[setup](docs/architecture.md#aws-deployment)). Every route and every tool that ran matched the local runs, and Brazil
+restored after a second call that carried the approved proposal id. On Fargate's CPU a Decider choice took a median of
+6.8 s, against 124 ms on the laptop GPU.
 Per-step numbers, latencies and the known Decider misses: [docs/measurements.md](docs/measurements.md).
 
 ## Benchmark: Decider vs Bedrock-only vs rules vs random
@@ -107,7 +113,8 @@ Decider's raw first pick was the preferred tool only half the time; the confiden
 into read-only evidence gathering. Bedrock picked better first tools (81.7%) but escalated half of the transient
 incidents instead of retrying, and its stated confidence never dropped below 0.55, so the same routing never held it
 back. **These are synthetic incidents from families we designed**,
-Decider ran on a laptop GPU and Bedrock in eu-central-1, and each chooser ran once. Read the caveats in
+Decider ran on a laptop GPU and Bedrock in eu-central-1, and each chooser ran once. On the AWS Fargate CPU task a
+Decider choice takes about 6.8 s, so the latency row does not carry over to that host. Read the caveats in
 [docs/measurements.md](docs/measurements.md#benchmark) before quoting any of it.
 
 ## Run it
@@ -115,7 +122,7 @@ Decider ran on a laptop GPU and Bedrock in eu-central-1, and each chooser ran on
 ```bash
 git clone https://github.com/HDGoldi/simshift-agent && cd simshift-agent
 make install                     # or: uv venv && uv pip install -e . pytest
-make test                        # 147 tests + trace validation; no Decider server or AWS needed
+make test                        # 155 tests + trace validation; no Decider server or AWS needed
 make ui                          # Recovery Decision Inspector on recorded real Decider answers: http://127.0.0.1:8090
 make replay                      # re-run all six recorded traces against the current code
 ```
@@ -153,8 +160,8 @@ twin, and Bedrock's plan review and explanation.
 
 ## Tests
 
-`make test` runs 147 tests and validates every published trace and the benchmark file. Without AWS credentials and a
-Decider server, 146 pass and the real-Decider test skips (set `SIMSHIFT_REQUIRE_DECIDER=1` to make that a failure).
+`make test` runs 155 tests and validates every published trace and the benchmark file. Without AWS credentials and a
+Decider server, 154 pass and the real-Decider test skips (set `SIMSHIFT_REQUIRE_DECIDER=1` to make that a failure).
 Bedrock is never called in tests. The acceptance properties covered:
 - Decider's choice controls which Strands tool runs; Bedrock in orchestrator mode cannot change it.
 - Excluded options are never offered and are denied on any call path; an independent audit counts violations.
@@ -178,6 +185,7 @@ Bedrock is never called in tests. The acceptance properties covered:
 patterns/capability_aware_router/   reusable Decider pattern (router, README, example, one test file per property)
 simshift/agent.py                   Incident (one steppable session), the six Strands tools, audit, CLI
 simshift/orchestrator.py            Bedrock-run loop with two zero-argument tools
+deploy/                             AWS deployment: AgentCore runtime, Decider image and Fargate stack, recorder
 simshift/web.py, simshift/static/   Recovery Decision Inspector UI (stdlib HTTP server, no extra dependencies)
 simshift/policy.py                  option descriptions, exclusions, profile gate, transition paths, counterfactuals
 simshift/simulator.py               deterministic fleet twin + virtual eIM/IPA/eUICC, 6 scenarios
@@ -190,12 +198,10 @@ spikes/decider_spike.py             standalone Decider API probe used to validat
 
 ## Status and next steps
 
-Done: the agent, the pattern, six scenarios, the orchestrator mode, the UI, the benchmark, all run locally (Decider on
-MLX, Bedrock in eu-central-1).
+Done: the agent, the pattern, six scenarios, the orchestrator mode, the UI and the benchmark, locally (Decider on MLX,
+Bedrock in eu-central-1), and the AWS deployment (AgentCore Runtime plus Decider on Fargate) with six recorded runs.
 
 Next:
-- AWS hosting: agent on Bedrock AgentCore Runtime, Decider on an ECS Fargate CPU container (plan in
-  [docs/architecture.md](docs/architecture.md#planned-aws-deployment-not-deployed-yet)). No AWS latency is claimed until then.
 - Publish the article ([draft](docs/article/article.md)) and record the video ([script](docs/article/video-script.md)).
 
 Submission status: [docs/hackathon-submission.md](docs/hackathon-submission.md).

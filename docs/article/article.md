@@ -8,8 +8,11 @@
   deterministic policy has already filtered.
 - Bedrock can run the whole agent loop, but it gets two tools without parameters, so it cannot pick a recovery tool
   or approve anything.
-- On 60 generated incidents, Decider through our router ended 96.7% correctly at a median of 106 ms per choice.
-  Bedrock choosing alone ended 91.7% correctly at 2.1 s per choice. The incidents are synthetic; the caveats are below.
+- On 60 generated incidents, Decider through our router ended 96.7% correctly at a median of 106 ms per choice on a
+  laptop GPU. Bedrock choosing alone ended 91.7% correctly at 2.1 s per choice. The incidents are synthetic; the
+  caveats are below.
+- Deployed on AWS (AgentCore Runtime, Decider on a Fargate CPU task), the six scenarios took the same routes and
+  tools as on the laptop. Without a GPU, a Decider choice took a median of 6.8 s.
 - The reusable part is `CapabilityAwareRouter`, a small pattern with no telecom code.
 
 ![Recovery Decision Inspector: Brazil cohort restored after a gated, human-approved profile switch](../screenshots/brazil-restored.png)
@@ -196,7 +199,9 @@ What I take from it:
   at the output limit and went to the fallback.
 - **Speed and cost.** About 20 times lower latency per choice, and no Bedrock tokens for routine choices. Decider ran
   on a laptop GPU (MLX on an Apple M4 Max) and Bedrock in eu-central-1, so this is the latency an agent built this way
-  sees, not a like-for-like model comparison.
+  sees, not a like-for-like model comparison. On the AWS deployment, where Decider runs on a Fargate CPU task, a
+  choice took a median of 6.8 s, about three times Bedrock's. On that CPU task the advantage is gone; we did not try a
+  GPU host.
 - **The guardrails kept even random choices safe.** No chooser made a forbidden execution or an unnecessary profile
   change. The chooser decides whether and how fast recovery happens.
 - **Rules did well because rules can.** I wrote the runbook from domain knowledge, and these families are tidy. It
@@ -264,9 +269,11 @@ example and one test file per property, and a test checks that it imports nothin
 - **How the telecom side was checked.** We asked a self-hosted, telecom-tuned open-weight LLM to critique a written
   description of the design, and ran an LLM-assisted review that read the relevant 3GPP clauses but not the full GSMA
   SGP.32 v1.3 text. Neither saw the code. We checked each point against the code and turned the useful ones into
-  rules, tests and that table. Nothing here is certified or standards-validated. The agent and Decider run locally today; only Bedrock runs on AWS. The planned deployment is
-AgentCore Runtime for the agent and a private Fargate container for Decider, and no AWS latency is claimed until it
-exists.
+  rules, tests and that table. Nothing here is certified or standards-validated.
+- **Where it runs.** The deployed agent runs on Bedrock AgentCore Runtime and calls Decider on a private ECS Fargate
+  task with no GPU. The six AWS runs took the same routes and tools as the local ones, at a median of 6.8 s per Decider choice
+  ([docs/sample-runs/aws/](https://github.com/HDGoldi/simshift-agent/tree/main/docs/sample-runs/aws)). The benchmark
+  numbers above are from the laptop.
 
 **Lessons.**
 1. **Filter before the model sees the options.** It is simpler and safer than asking the model to avoid them, and

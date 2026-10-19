@@ -45,7 +45,8 @@ Code: [`simshift/agent.py`](../simshift/agent.py) (`Incident`: one steppable ses
 In orchestrator mode Bedrock decides when to look, when to advance and how to report. `advance_recovery` has no
 parameters, so Bedrock cannot name a recovery tool, skip the policy or approve a change. If Bedrock stops early, the
 incident is finished deterministically and Bedrock is asked to rewrite its report for the final trace
-(`report_after_fallback` in the result). If a Bedrock call fails, the incident is still finished and the error is
+(`report_after_fallback` in the result). The same rewrite happens when a run resolves a proposal id that a human
+approved earlier (`approved_ids`, used by the AWS deployment). If a Bedrock call fails, the incident is still finished and the error is
 recorded. The two tools share a budget of 16 calls; past it they stop the agent loop. All six orchestrated runs in
 [`docs/sample-runs/orchestrated/`](sample-runs/orchestrated/) replay to the same tools through the plain loop.
 When the budget runs out, Bedrock's report is discarded and the result says why; a report is never returned for an
@@ -65,7 +66,7 @@ incident state it did not see. The report is Bedrock's prose and is not checked 
 
 ## Real vs simulated
 
-**Real:** Decider inference (local HTTP server, pinned checkpoint), Bedrock Converse calls through Strands, Strands
+**Real:** Decider inference (pinned checkpoint, served over HTTP by the local MLX server or the ECS Fargate task), Bedrock Converse calls through Strands, Strands
 tool execution and intervention hooks.
 
 **Simulated:** every device, operator, eSIM profile, eIM/IPA command and rate. No carrier, eUICC, SM-DP+ or
@@ -221,12 +222,29 @@ telemetry rates.
 | `FW_LOOP` | a firmware rollout put modems in a reset loop | find the reset loop and escalate to the device team; no network or eSIM change can fix it |
 | `TRANSIENT` | radio congestion after a cell site restart | one bounded retry |
 
-## Planned AWS deployment (not deployed yet)
+## AWS deployment
 
-- Agent: Amazon Bedrock AgentCore Runtime, running the orchestrator entry point.
-- Decider: the pinned `strands-decider serve` container on ECS Fargate (CPU), reachable only from the agent's
-  network. The upstream server has no authentication and is meant for one request at a time, so it stays private and
-  single-tenant.
-- Bedrock: Claude Haiku 5.5 in eu-central-1, as today.
+Deployed 2026-10-19 in eu-central-1. Every resource in both stacks that takes tags carries `environment` and
+`component`. Commands are in
+[`deploy/README.md`](../deploy/README.md); measured latency is in [measurements](measurements.md#deployed-on-aws-eu-central-1).
 
-No latency or cost figure for this deployment exists yet; none is quoted anywhere in this repository.
+```
+caller (IAM) --InvokeAgentRuntime--> AgentCore Runtime "simshift" (VPC mode, private subnets, arm64)
+    main.py -> orchestrate(scenario, approved_ids) -> Bedrock Claude Haiku 5.5 (the VPC's NAT or a bedrock-runtime endpoint)
+                                                   -> http://decider.simshift.local:8099 (Cloud Map private DNS)
+        ECS Fargate task, arm64, 4 vCPU / 16 GB: strands-decider serve --device cpu (pinned 930e6d5d, weights in the image)
+```
+
+- **Agent:** the orchestrator ([`deploy/agentcore/app/runtime/main.py`](../deploy/agentcore/app/runtime/main.py)) on
+  Bedrock AgentCore Runtime, built and deployed with the `@aws/agentcore` CLI. One invocation runs one incident and
+  returns its full trace. Callers need IAM permission (SigV4) to call `InvokeAgentRuntime`; there is no unauthenticated
+  endpoint.
+- **Approvals across calls:** a run that stops for a human returns its `pending_approval` id. Re-invoking with
+  `approved_ids: [that id]` re-runs the incident; the twin is deterministic, so it proposes the same id, and the
+  approval is recorded as the human's answer at that point. Any other id leaves the proposal pending.
+- **Decider:** the pinned server with both model snapshots baked into the image
+  ([`deploy/decider/`](../deploy/decider/)) and `HF_HUB_OFFLINE=1`, so the task never downloads anything. The
+  upstream server has no authentication, so its security group accepts port 8099 only from the runtime's security
+  group, and nothing else can reach it.
+- **On demand:** the Fargate service is scaled to one task while recording or demoing and to zero otherwise.
+- **Bedrock:** Claude Haiku 5.5 through the `eu.` inference profile, as in the local runs.

@@ -1,8 +1,46 @@
 # Measurements (what was actually observed)
 
-All numbers below were measured on 2026-10-18 and 2026-10-19 on synthetic incidents; every run and benchmark figure is from 2026-10-19, on the current code. The agent and Decider are not hosted on AWS
-yet; only the Bedrock calls run on AWS. Not yet verified: Decider latency and memory on AWS hardware, and the
-AgentCore Runtime deployment. This page will be updated once the AWS deployment exists.
+All numbers below were measured on 2026-10-18 and 2026-10-19 on synthetic incidents; every run and benchmark figure
+is from 2026-10-19, on the current code. The AWS section is the deployed system; the sections after it are the local
+runs (Decider on a laptop GPU, Bedrock on AWS) that the benchmark also uses.
+
+## Deployed on AWS (eu-central-1)
+
+The orchestrator runs on Bedrock AgentCore Runtime (VPC mode, arm64) and calls Decider on a private ECS Fargate task
+(arm64, 4 vCPU, 16 GB, torch on CPU, the same pinned checkpoint). Setup and network rules:
+[architecture](architecture.md#aws-deployment). Traces: [`docs/sample-runs/aws/`](sample-runs/aws/), recorded
+2026-10-19 with `deploy/invoke.py`, which refuses to save a run if any Decider call failed or Bedrock reported an
+error. Brazil was recorded twice: the first call stopped at the approval gate, and the second call carried the
+approved proposal id (`approved_ids`), so the trace records the approval as a separate human answer.
+
+| Run | Decider top choice and confidence → route, tool (server latency) | Outcome | Bedrock tokens in / out |
+|---|---|---|---|
+| [BR_PROFILE.pending](sample-runs/aws/BR_PROFILE.pending.json) | retry_connection 0.04 → gather_evidence, data-path diagnostics (6.7 s); retry_connection 0.19 → gather_evidence, modem diagnostics (6.9 s); evaluate_profile_change 0.88 → act, guarded profile switch (8.0 s) | pending approval | 8,596 / 1,412 |
+| [BR_PROFILE](sample-runs/aws/BR_PROFILE.json) | the same three answers (6.6 s, 6.7 s, 7.9 s); then the operator's approval re-submits the switch | **restored** | 14,674 / 1,979 |
+| [DE_OPERATOR](sample-runs/aws/DE_OPERATOR.json) | try_allowed_operator 0.46 → gather_evidence, data-path diagnostics (6.8 s); try_allowed_operator 0.63 → act, operator reselection (7.0 s) | **restored** | 5,135 / 722 |
+| [JP_INGEST](sample-runs/aws/JP_INGEST.json) | investigate_data_path 0.71 → act, data-path diagnostics (6.2 s); escalate_or_wait 0.08 → gather_evidence, modem diagnostics (7.0 s); only the fallback left, no model call | handed off | 7,660 / 732 |
+| [OFFLINE](sample-runs/aws/OFFLINE.json) | escalate_or_wait 0.07 → gather_evidence, data-path diagnostics (6.4 s); only the fallback left, no model call | handed off | 5,275 / 653 |
+| [FW_LOOP](sample-runs/aws/FW_LOOP.json) | retry_connection 0.38 → gather_evidence, modem diagnostics (6.8 s); escalate_or_wait 0.28 → gather_evidence, data-path diagnostics (7.9 s); only the fallback left, no model call | handed off | 7,821 / 786 |
+| [TRANSIENT](sample-runs/aws/TRANSIENT.json) | retry_connection 0.79 → act, bounded retry (6.9 s) | **restored** | 3,254 / 560 |
+
+- **Decider latency on Fargate CPU:** median 6.8 s per choice (6.2 to 7.9 s, server `latency_ms`, 11 calls: one run
+  per scenario, Brazil's approved run; the pending run's three calls, up to 8.0 s, are not counted; client-side
+  median 6.8 s). That is about 55 times the laptop GPU's 124 ms and about three times Bedrock's 2.1 s per choice in
+  the benchmark. Fargate has no GPU; we did not try a GPU host.
+- **Same decisions as the local runs:** every route and every tool that ran matches the local orchestrated runs in
+  all six scenarios (Brazil adds the separate approval step). Decider's top choice matched in 10 of 11 calls and
+  confidences differ by at most 0.013 (fp32 on CPU versus MLX). The one different top choice, OFFLINE step 1, was
+  below the act threshold in both runs (0.07 and 0.06), so both ran the same read-only tool.
+- **Cold start, measured once from the ECS task timestamps:** the 4.1 GB image (compressed) pulled in 67 s and the
+  task reported healthy about 2.7 minutes after the scale-up. Decider is scaled to zero between sessions.
+- **Memory:** about 9.2 GB in a local `docker run` of the same image with a 16 GB limit; we did not read the Fargate
+  task's memory.
+- The Bedrock token counts are per run and include the report; Brazil's approved run also rewrites the report after
+  the approval. As in the local runs, the plan-review call inside the profile-change tool is not included.
+- **The two Brazil plan reviews disagreed.** In the pending run Bedrock's review recommended proceeding. The approved
+  run re-ran the incident and wrote a new review, which did not recommend proceeding and asked for a staged canary
+  first; both said a blind fleet-wide switch was not advisable. The human approved after reading the first review.
+  The review is advisory: the gate does not read it, and the approval is bound to the proposal id, not to a review.
 
 ## Decider inference (local)
 

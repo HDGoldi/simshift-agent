@@ -1,0 +1,189 @@
+{
+ "scenario": "OFFLINE",
+ "title": "Remote devices: no heartbeat, no management path",
+ "approved": false,
+ "human_answers": {},
+ "bedrock_model": "eu.anthropic.claude-haiku-5-5",
+ "trace": [
+  {
+   "step": 1,
+   "decision": {
+    "question": "Given the cellular connectivity symptoms, diagnostic evidence so far, and only these admissible tools, which next tool is most useful for safely advancing service restoration? Do not assume an unverified recovery path works.",
+    "state": {
+     "incident": "Devices silent; no heartbeat",
+     "country": "CL",
+     "affected_devices": 1250,
+     "attach_success_rate": 0.0,
+     "data_session_rate": 0.0,
+     "app_ack_rate": 0.0,
+     "heartbeat_rate": 0.0,
+     "serving_operator": "CL-NET-1",
+     "active_profile": "profile_A",
+     "other_operator_allowed_on_active_profile": false,
+     "alternative_profile_installed": true,
+     "management_path_reachable": false,
+     "recent_firmware_change": false,
+     "attempted_retries": 2,
+     "diagnostics": {}
+    },
+    "eligible": {
+     "retry_connection": "Bounded backoff and re-attach on the current profile and operator; suits brief or improving disruptions",
+     "investigate_data_path": "Read-only: check network-side data sessions, APN and application ingestion; suits devices that register but whose telemetry fails",
+     "escalate_or_wait": "Hold and hand off to a human with the collected evidence; suits cases no admissible remote action can fix"
+    },
+    "excluded": {
+     "try_allowed_operator": "active profile permits no other operator in coverage",
+     "investigate_device": "devices unreachable; no modem logs retrievable",
+     "evaluate_profile_change": "no management path to the IPA; OTA profile change impossible"
+    },
+    "raw": {
+     "choice": "escalate_or_wait",
+     "probabilities": {
+      "retry_connection": 0.256,
+      "investigate_data_path": 0.3653,
+      "escalate_or_wait": 0.3786
+     },
+     "confidence": 0.068,
+     "model": "strands-decider-2B-qwen3.5-v1-2610",
+     "latency_ms": 6389.65,
+     "client_latency_ms": 6406.8
+    },
+    "selected": "investigate_data_path",
+    "route": "gather_evidence",
+    "reason": "confidence 0.07 < 0.5: most probable read-only option",
+    "tool": "query_apn_session_app_diagnostics"
+   },
+   "tool": "query_apn_session_app_diagnostics",
+   "tool_status": "success",
+   "tool_result": {
+    "seq": 1,
+    "kind": "diagnostics_data_path",
+    "result": {
+     "network_side_attach_attempts_last_6h": 0,
+     "summary": "no attach attempts seen by any network and no periodic registration updates since the last heartbeat (a PSM device still sends them when its periodic timer expires); last known cells normal (power/field issue suspected)"
+    }
+   },
+   "rates_after": {
+    "attach_success_rate": 0.0,
+    "data_session_rate": 0.0,
+    "app_ack_rate": 0.0,
+    "heartbeat_rate": 0.0
+   }
+  },
+  {
+   "step": 2,
+   "decision": {
+    "question": "Given the cellular connectivity symptoms, diagnostic evidence so far, and only these admissible tools, which next tool is most useful for safely advancing service restoration? Do not assume an unverified recovery path works.",
+    "state": {
+     "incident": "Devices silent; no heartbeat",
+     "country": "CL",
+     "affected_devices": 1250,
+     "attach_success_rate": 0.0,
+     "data_session_rate": 0.0,
+     "app_ack_rate": 0.0,
+     "heartbeat_rate": 0.0,
+     "serving_operator": "CL-NET-1",
+     "active_profile": "profile_A",
+     "other_operator_allowed_on_active_profile": false,
+     "alternative_profile_installed": true,
+     "management_path_reachable": false,
+     "recent_firmware_change": false,
+     "attempted_retries": 2,
+     "diagnostics": {
+      "data_path": {
+       "network_side_attach_attempts_last_6h": 0,
+       "summary": "no attach attempts seen by any network and no periodic registration updates since the last heartbeat (a PSM device still sends them when its periodic timer expires); last known cells normal (power/field issue suspected)"
+      }
+     }
+    },
+    "eligible": {
+     "escalate_or_wait": "Hold and hand off to a human with the collected evidence; suits cases no admissible remote action can fix"
+    },
+    "excluded": {
+     "retry_connection": "no attach attempts seen by any network; a network-side re-attach cannot reach devices that are not trying to attach",
+     "try_allowed_operator": "active profile permits no other operator in coverage",
+     "investigate_device": "devices unreachable; no modem logs retrievable",
+     "evaluate_profile_change": "no management path to the IPA; OTA profile change impossible",
+     "investigate_data_path": "evidence already collected"
+    },
+    "raw": null,
+    "selected": "escalate_or_wait",
+    "route": "fallback",
+    "reason": "only the fallback is admissible",
+    "tool": "defer_or_escalate"
+   },
+   "tool": "defer_or_escalate",
+   "tool_status": "success",
+   "tool_result": {
+    "escalated": true,
+    "evidence": {
+     "data_path": {
+      "network_side_attach_attempts_last_6h": 0,
+      "summary": "no attach attempts seen by any network and no periodic registration updates since the last heartbeat (a PSM device still sends them when its periodic timer expires); last known cells normal (power/field issue suspected)"
+     }
+    }
+   },
+   "rates_after": {
+    "attach_success_rate": 0.0,
+    "data_session_rate": 0.0,
+    "app_ack_rate": 0.0,
+    "heartbeat_rate": 0.0
+   }
+  }
+ ],
+ "outcome": {
+  "restored": false,
+  "initial_rates": {
+   "attach_success_rate": 0.0,
+   "data_session_rate": 0.0,
+   "app_ack_rate": 0.0,
+   "heartbeat_rate": 0.0
+  },
+  "final_rates": {
+   "attach_success_rate": 0.0,
+   "data_session_rate": 0.0,
+   "app_ack_rate": 0.0,
+   "heartbeat_rate": 0.0
+  },
+  "active_profile": "profile_A",
+  "serving_operator": "CL-NET-1",
+  "steps": 2,
+  "simulated_minutes": 70,
+  "profile_changes": 0,
+  "forbidden_executions": 0,
+  "blocked_calls": 0
+ },
+ "explanation": null,
+ "events": [
+  {
+   "seq": 1,
+   "kind": "diagnostics_data_path",
+   "result": {
+    "network_side_attach_attempts_last_6h": 0,
+    "summary": "no attach attempts seen by any network and no periodic registration updates since the last heartbeat (a PSM device still sends them when its periodic timer expires); last known cells normal (power/field issue suspected)"
+   }
+  },
+  {
+   "seq": 2,
+   "kind": "escalated",
+   "evidence": {
+    "data_path": {
+     "network_side_attach_attempts_last_6h": 0,
+     "summary": "no attach attempts seen by any network and no periodic registration updates since the last heartbeat (a PSM device still sends them when its periodic timer expires); last known cells normal (power/field issue suspected)"
+    }
+   }
+  }
+ ],
+ "mode": "orchestrated",
+ "report": "**What happened**\nSimulated incident in CL (1,250 devices on CL-NET-1): all four rates were 0.0 and there was no heartbeat. The management path to the IPA was unreachable, and no modem logs could be retrieved.\n\n**Decisions**\n- **Step 1.** Policy removed try_allowed_operator (no other operator permitted on the active profile), investigate_device (devices unreachable, no logs) and evaluate_profile_change (no management path, so no OTA change). The decider chose escalate_or_wait at confidence 0.068, which was below the 0.5 threshold, so it routed to gather_evidence. It ran query_apn_session_app_diagnostics: zero network-side attach attempts in 6 hours, no periodic registration updates, last known cells normal. Likely a power or field issue.\n- **Step 2.** Policy removed retry_connection (devices are not attempting to attach, so a network re-attach cannot reach them) and the other options already excluded. Only the fallback remained, so defer_or_escalate ran and escalated. No confidence score applies.\n\n**Outcome**\nRates after the last step: attach 0.0, data session 0.0, app ack 0.0, heartbeat 0.0. Not restored. No profile change was made or proposed, so no approval was needed.\n\n**Next**\nEscalate to field operations to check power and site conditions at the affected devices. Restore the management path to the IPA, then re-run diagnostics. Note that devices in PSM would normally send periodic updates, so the absence of any registration is significant.\n\n*All of this ran in a simulated environment.*",
+ "report_after_fallback": false,
+ "bedrock_error": null,
+ "bedrock_usage": {
+  "inputTokens": 5275,
+  "outputTokens": 653,
+  "totalTokens": 5928
+ },
+ "advance_calls": 2,
+ "pending_approval": null,
+ "decider_source": "live http://decider.simshift.local:8099 (ECS Fargate)"
+}

@@ -134,3 +134,36 @@ def test_budget_exhaustion_is_reported():
     model = ScriptedModel([("tool", "get_incident_state", {})] * 100)
     r = orchestrate("OFFLINE", model=model, decider=ScriptedDecider(["investigate_data_path"]))
     assert r["report"] is None and "budget" in r["bedrock_error"]
+
+
+def test_a_proposal_id_approved_earlier_is_resolved_as_a_human_answer():
+    from simshift.policy import proposal_id
+    from simshift.simulator import FleetTwin
+    from simshift.validate import problems
+
+    pid = proposal_id(FleetTwin("BR_PROFILE"), "profile_B")
+    decider = ["investigate_data_path", "investigate_device", "evaluate_profile_change"]
+    r = orchestrate("BR_PROFILE", model=ScriptedModel([ADVANCE] * 3 + [("text", "PENDING"), ("text", "FINAL")]),
+                    decider=ScriptedDecider(decider), approved_ids=[pid])
+    assert r["outcome"]["restored"] and r["human_answers"] == {pid: True} and not r["approved"]
+    assert r["trace"][-1]["note"] == f"operator approved proposal {pid}"
+    assert r["report"] == "FINAL" and r["report_after_fallback"]
+    assert problems(r) == []
+
+    other = orchestrate("BR_PROFILE", model=ScriptedModel([ADVANCE] * 3), decider=ScriptedDecider(decider),
+                        approved_ids=["not-this-proposal"])
+    assert not other["outcome"]["restored"] and other["human_answers"] == {}
+
+
+def test_a_rewrite_that_spends_the_tool_budget_discards_the_report_and_says_why():
+    from simshift.orchestrator import MAX_TOOL_CALLS
+    from simshift.policy import proposal_id
+    from simshift.simulator import FleetTwin
+
+    pid = proposal_id(FleetTwin("BR_PROFILE"), "profile_B")
+    looping = [("tool", "get_incident_state", {})] * (MAX_TOOL_CALLS + 5)
+    r = orchestrate("BR_PROFILE", model=ScriptedModel([ADVANCE] * 3 + [("text", "PENDING")] + looping),
+                    decider=ScriptedDecider(["investigate_data_path", "investigate_device", "evaluate_profile_change"]),
+                    approved_ids=[pid])
+    assert r["outcome"]["restored"] and r["report"] is None and not r["report_after_fallback"]
+    assert "tool budget" in r["bedrock_error"]

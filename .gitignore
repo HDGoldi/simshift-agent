@@ -12,3 +12,12 @@ docs/internal/
 !.env.example
 *.pem
 *.tmp
+# AgentCore deploy: these hold the account id, ARNs or build output
+deploy/agentcore/agentcore/aws-targets.json
+deploy/agentcore/agentcore/.cli/
+deploy/agentcore/agentcore/.cache/
+deploy/agentcore/agentcore/.env.local
+deploy/agentcore/agentcore/cdk/cdk.out/
+deploy/agentcore/agentcore/cdk/node_modules/
+deploy/agentcore/app/runtime/simshift/
+deploy/agentcore/app/runtime/patterns/

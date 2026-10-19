@@ -1,0 +1,62 @@
+{
+  "$schema": "https://schema.agentcore.aws.dev/v1/agentcore.json",
+  "name": "simshift",
+  "version": 1,
+  "managedBy": "CDK",
+  "tags": {
+    "agentcore:created-by": "agentcore-cli",
+    "agentcore:project-name": "simshift",
+    "environment": "dev",
+    "component": "ai"
+  },
+  "runtimes": [
+    {
+      "name": "simshift",
+      "build": "CodeZip",
+      "entrypoint": "main.py",
+      "codeLocation": "app/runtime/",
+      "runtimeVersion": "PYTHON_3_13",
+      "networkMode": "VPC",
+      "networkConfig": {
+        "subnets": [
+          "subnet-0e786f3f6a9a81284",
+          "subnet-0149663875bcc5376"
+        ],
+        "securityGroups": [
+          "sg-0b48c26e965052b64"
+        ]
+      },
+      "protocol": "HTTP",
+      "lifecycleConfiguration": {
+        "idleRuntimeSessionTimeout": 300
+      },
+      "envVars": [
+        {
+          "name": "DECIDER_URL",
+          "value": "http://decider.simshift.local:8099"
+        },
+        {
+          "name": "AWS_REGION",
+          "value": "eu-central-1"
+        }
+      ],
+      "instrumentation": {
+        "enableOtel": false
+      },
+      "description": "SIMShift orchestrator: Bedrock runs the loop, Strands Decider 2B picks every recovery tool"
+    }
+  ],
+  "memories": [],
+  "knowledgeBases": [],
+  "credentials": [],
+  "evaluators": [],
+  "onlineEvalConfigs": [],
+  "agentCoreGateways": [],
+  "policyEngines": [],
+  "configBundles": [],
+  "abTests": [],
+  "harnesses": [],
+  "datasets": [],
+  "capacityProviders": [],
+  "payments": []
+}

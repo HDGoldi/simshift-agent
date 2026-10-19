@@ -6,7 +6,7 @@ install:
 
 test:
 	.venv/bin/pytest -q
-	$(PY) -m simshift.validate docs/sample-runs/*.json docs/sample-runs/orchestrated/*.json
+	$(PY) -m simshift.validate docs/sample-runs/*.json docs/sample-runs/orchestrated/*.json docs/sample-runs/aws/*.json
 
 replay:  # re-run every published trace against the recorded Decider answers (no Decider server, no AWS)
 	for f in docs/sample-runs/orchestrated/*.json; do s=$$(basename $$f .json); \
@@ -18,4 +18,9 @@ ui:  # recorded real Decider answers; open http://127.0.0.1:8090
 ui-live:  # needs the Decider server on :8099 and AWS credentials for Bedrock
 	$(PY) -m simshift.web --bedrock
 
-.PHONY: install test replay ui ui-live
+agentcore-bundle:  # copy the packages the AgentCore runtime imports next to its entry point (gitignored copies)
+	rm -rf deploy/agentcore/app/runtime/simshift deploy/agentcore/app/runtime/patterns
+	rsync -a --exclude __pycache__ --exclude static simshift deploy/agentcore/app/runtime/
+	rsync -a --exclude __pycache__ --exclude tests patterns deploy/agentcore/app/runtime/
+
+.PHONY: install test replay ui ui-live agentcore-bundle

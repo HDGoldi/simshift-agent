@@ -77,7 +77,20 @@ def orchestrator_tools(inc: Incident) -> list:
     return [get_incident_state, advance_recovery]
 
 
-def orchestrate(scenario_id: str, approve: bool = False, decider=None, model=None) -> dict:
+def _finish(inc: Incident, approved_ids: frozenset) -> None:
+    """Steps to the end. A pending proposal whose id a human approved before this run (the twin is deterministic, so
+    a re-run proposes the same id) is resolved as that human's answer, never by Bedrock."""
+    while True:
+        while not inc.done:
+            inc.step()
+        if inc.pending_approval is None or inc.pending_approval not in approved_ids:
+            return
+        inc.resolve_approval(True)
+
+
+def orchestrate(scenario_id: str, approve: bool = False, decider=None, model=None, approved_ids=()) -> dict:
+    """`approved_ids`: proposal ids a human approved, for example from an earlier run that stopped pending."""
+    approved_ids = frozenset(approved_ids)
     inc = Incident(scenario_id, approve, decider, use_bedrock=True)
     tools = orchestrator_tools(inc)
     agent = Agent(model=model or inc.llm, tools=tools, system_prompt=SYSTEM_PROMPT,
@@ -85,29 +98,30 @@ def orchestrate(scenario_id: str, approve: bool = False, decider=None, model=Non
     report, error, rewritten = None, None, False
     try:
         report = str(agent(f"New incident: {inc.twin.s['incident']}. Follow your procedure.")).strip()
+        budget_spent = f"tool budget of {MAX_TOOL_CALLS} calls exhausted; Bedrock's report was discarded"
         if tools[0].calls["total"] > MAX_TOOL_CALLS:
-            report, error = None, f"tool budget of {MAX_TOOL_CALLS} calls exhausted; Bedrock's report was discarded"
-        if not inc.done:  # Bedrock stopped early: finish deterministically, then have it report on the final trace
-            first = len(inc.trace)
-            while not inc.done:
-                inc.step()
+            report, error = None, budget_spent
+        if not inc.done or inc.pending_approval in approved_ids:  # Bedrock stopped early, or a human approved the
+            first = len(inc.trace)                                     # pending proposal: finish, then report again
+            _finish(inc, approved_ids)
             if error is None:
                 rest = [_summary(t, inc) for t in inc.trace[first:]]
                 report = None  # the first report describes an unfinished incident; never return it as final
-                report = str(agent("You stopped before the incident was finished. These steps then ran "
-                                   "deterministically:\n" + json.dumps(rest) +
+                report = str(agent("The incident continued after your last tool call. These steps then ran "
+                                   "deterministically (an operator approval is a human's answer):\n" + json.dumps(rest) +
                                    "\nRewrite the full report for the final state.")).strip() or None
                 rewritten = report is not None
+                if tools[0].calls["total"] > MAX_TOOL_CALLS:  # the rewrite turn can spend the budget too
+                    report, rewritten, error = None, False, budget_spent
     except Exception as e:  # Bedrock failed mid-run: the incident still ends safely and the trace is kept
         report, error = None, f"{type(e).__name__}: {e}"
-        while not inc.done:
-            inc.step()
+        _finish(inc, approved_ids)
     usage = agent.event_loop_metrics.accumulated_usage
     # The report is Bedrock's prose and is not checked against the trace: trace and outcome are the record.
     return {**inc.result(explain=False), "mode": "orchestrated", "report": report, "report_after_fallback": rewritten,
             "bedrock_error": error,
             "bedrock_usage": {k: usage.get(k) for k in ("inputTokens", "outputTokens", "totalTokens")},
-            "advance_calls": tools[0].calls["advance"]}
+            "advance_calls": tools[0].calls["advance"], "pending_approval": inc.pending_approval}
 
 
 if __name__ == "__main__":

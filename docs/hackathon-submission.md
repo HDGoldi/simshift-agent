@@ -5,7 +5,7 @@
 
 | Requirement (from the official rules) | Where it is | Status |
 |---|---|---|
-| Working agent built on AWS | Strands agent; Bedrock in eu-central-1; AgentCore Runtime + Decider on Fargate planned | partly: Bedrock on AWS, hosting pending |
+| Working agent built on AWS | Strands agent on Bedrock AgentCore Runtime, Decider on a private ECS Fargate task, Bedrock in eu-central-1 ([deployment](architecture.md#aws-deployment), [AWS traces](sample-runs/aws/)) | done; 6 scenarios recorded on AWS |
 | Strands Decider 2B handles at least one meaningful decision | next-tool selection at every step; the choice decides which Strands tool runs ([README](../README.md#the-decision-decider-makes)) | done |
 | Paired with Amazon Bedrock for the generative part | profile-change plan review, outcome explanation, and an orchestrator mode where Bedrock runs the loop through two zero-argument tools ([`simshift/orchestrator.py`](../simshift/orchestrator.py)) | done; 6 live orchestrated runs recorded |
 | Public code repository with the agent's source | this repository | done |
@@ -20,7 +20,7 @@ handling. All three are in: low-confidence routing is visible in every trace, an
 [`docs/benchmark/`](benchmark/) compares rules, random, Decider and two Bedrock-only choosers (with and without a
 stated confidence) on 60 generated incidents, with accuracy, latency and Bedrock token counts
 ([measurements](measurements.md#benchmark)).
-Latency on AWS hardware is not measured yet.
+On the AWS deployment a Decider choice takes a median of 6.8 s on Fargate CPU ([measurements](measurements.md#deployed-on-aws-eu-central-1)).
 
 ## Pre-submit QA
 

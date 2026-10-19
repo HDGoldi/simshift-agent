@@ -1,0 +1,124 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: >-
+  SIMShift: the pinned Strands Decider 2B on a private ECS Fargate task (arm64, CPU), reachable only from the
+  AgentCore runtime's security group at decider.<namespace>:8099. Deploy with
+  --tags environment=dev component=ai (the org SCP requires both on create calls).
+
+Parameters:
+  VpcId: {Type: "AWS::EC2::VPC::Id"}
+  SubnetIds: {Type: "List<AWS::EC2::Subnet::Id>", Description: private subnets with a NAT or ECR/S3/logs endpoints}
+  NamespaceId: {Type: String, Description: Cloud Map private DNS namespace id (created separately)}
+  ImageTag: {Type: String, Default: 930e6d5d}
+  DesiredCount: {Type: Number, Default: 0, AllowedValues: [0, 1]}
+
+Resources:
+  Repository:
+    Type: AWS::ECR::Repository
+    Properties:
+      RepositoryName: simshift-decider
+      ImageScanningConfiguration: {ScanOnPush: true}
+      Tags: [{Key: environment, Value: dev}, {Key: component, Value: ai}]
+
+  Cluster:
+    Type: AWS::ECS::Cluster
+    Properties:
+      ClusterName: simshift
+      Tags: [{Key: environment, Value: dev}, {Key: component, Value: ai}]
+
+  LogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: /simshift/decider
+      RetentionInDays: 14
+      Tags: [{Key: environment, Value: dev}, {Key: component, Value: ai}]
+
+  ExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: simshift-decider-execution
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement: [{Effect: Allow, Principal: {Service: ecs-tasks.amazonaws.com}, Action: sts:AssumeRole}]
+      ManagedPolicyArns: [arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy]
+      Tags: [{Key: environment, Value: dev}, {Key: component, Value: ai}]
+
+  RuntimeSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupName: simshift-runtime
+      GroupDescription: SIMShift AgentCore runtime (egress only)
+      VpcId: !Ref VpcId
+      SecurityGroupEgress: [{IpProtocol: "-1", CidrIp: 0.0.0.0/0}]
+      Tags: [{Key: Name, Value: simshift-runtime}, {Key: environment, Value: dev}, {Key: component, Value: ai}]
+
+  DeciderSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupName: simshift-decider
+      GroupDescription: SIMShift Decider (port 8099 from the runtime only; the server has no auth)
+      VpcId: !Ref VpcId
+      SecurityGroupIngress:
+        - {IpProtocol: tcp, FromPort: 8099, ToPort: 8099, SourceSecurityGroupId: !Ref RuntimeSecurityGroup}
+      SecurityGroupEgress: [{IpProtocol: tcp, FromPort: 443, ToPort: 443, CidrIp: 0.0.0.0/0}]  # image pull, logs
+      Tags: [{Key: Name, Value: simshift-decider}, {Key: environment, Value: dev}, {Key: component, Value: ai}]
+
+  DiscoveryService:
+    Type: AWS::ServiceDiscovery::Service
+    Properties:
+      Name: decider
+      NamespaceId: !Ref NamespaceId
+      DnsConfig:
+        DnsRecords: [{Type: A, TTL: 10}]
+        RoutingPolicy: MULTIVALUE
+      HealthCheckCustomConfig: {FailureThreshold: 1}
+      Tags: [{Key: environment, Value: dev}, {Key: component, Value: ai}]
+
+  TaskDefinition:
+    Type: AWS::ECS::TaskDefinition
+    Properties:
+      Family: simshift-decider
+      RequiresCompatibilities: [FARGATE]
+      NetworkMode: awsvpc
+      Cpu: "4096"
+      Memory: "16384"
+      EphemeralStorage: {SizeInGiB: 30}
+      RuntimePlatform: {CpuArchitecture: ARM64, OperatingSystemFamily: LINUX}
+      ExecutionRoleArn: !GetAtt ExecutionRole.Arn
+      ContainerDefinitions:
+        - Name: decider
+          Image: !Sub "${Repository.RepositoryUri}:${ImageTag}"
+          Essential: true
+          PortMappings: [{ContainerPort: 8099, Protocol: tcp}]
+          HealthCheck:
+            Command: [CMD-SHELL, "python -c \"import urllib.request;urllib.request.urlopen('http://127.0.0.1:8099/health',timeout=5)\""]
+            Interval: 30
+            Timeout: 10
+            Retries: 3
+            StartPeriod: 300
+          LogConfiguration:
+            LogDriver: awslogs
+            Options: {awslogs-group: !Ref LogGroup, awslogs-region: !Ref "AWS::Region", awslogs-stream-prefix: decider}
+      Tags: [{Key: environment, Value: dev}, {Key: component, Value: ai}]
+
+  Service:
+    Type: AWS::ECS::Service
+    Properties:
+      ServiceName: decider
+      Cluster: !Ref Cluster
+      LaunchType: FARGATE
+      TaskDefinition: !Ref TaskDefinition
+      DesiredCount: !Ref DesiredCount
+      NetworkConfiguration:
+        AwsvpcConfiguration:
+          AssignPublicIp: DISABLED
+          Subnets: !Ref SubnetIds
+          SecurityGroups: [!Ref DeciderSecurityGroup]
+      ServiceRegistries: [{RegistryArn: !GetAtt DiscoveryService.Arn}]
+      PropagateTags: SERVICE
+      EnableECSManagedTags: true
+      Tags: [{Key: environment, Value: dev}, {Key: component, Value: ai}]
+
+Outputs:
+  RepositoryUri: {Value: !GetAtt Repository.RepositoryUri}
+  RuntimeSecurityGroupId: {Value: !Ref RuntimeSecurityGroup}
+  DeciderSecurityGroupId: {Value: !Ref DeciderSecurityGroup}
