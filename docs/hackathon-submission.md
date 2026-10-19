@@ -31,3 +31,5 @@ Latency on AWS hardware is not measured yet.
 - [ ] No credentials, account IDs or real customer data in the repo or video.
 - [ ] Every number in the article and video matches a committed file (`docs/measurements.md`, `docs/benchmark/`).
 - [ ] The UI screenshots and the video show the SIMULATED FLEET badge.
+- [ ] Telecom claims stay within [telecom-fidelity.md](telecom-fidelity.md): nothing is called standards-validated,
+      certified or SGP.32-compliant, and every "not modelled" item is still not claimed anywhere.

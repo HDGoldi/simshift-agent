@@ -113,6 +113,23 @@ python -m patterns.capability_aware_router.example
 pytest patterns/capability_aware_router/tests      # no model or AWS needed
 ```
 
+## Compared with a plain filter-then-choose router
+
+Filtering the options and letting a model pick from the rest is the common starting point. This pattern adds six
+things on top:
+- **A second gate at execution.** The same policy runs again as a Strands `InterventionHandler` before any routed
+  tool, so a tool excluded in the current state is denied even when it is called directly.
+- **Confidence routes.** Acting needs confidence ≥ `act_threshold`. Below it, the most probable read-only option runs
+  to gather evidence, and if no read-only option is left, the fallback runs.
+- **Answer checks.** The probabilities must cover exactly the offered options, be numbers in [0, 1] and sum to 1. The
+  choice must be the most probable option, and the confidence must match its formula.
+- **Fail closed.** An outage, an off-menu choice, or a malformed or inconsistent answer goes to the fallback; it never
+  crashes the step.
+- **Replay.** `ReplayDecider` re-runs a saved trace without a model and refuses an answer recorded for a different
+  question.
+- **No tool choice for the orchestrating LLM.** An LLM can drive the loop through zero-argument tools without ever
+  choosing the tool (see above).
+
 ## Tested properties
 
 One file per property in [`tests/`](tests/). No model download and no AWS.

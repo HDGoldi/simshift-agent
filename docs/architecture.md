@@ -18,7 +18,8 @@
               │ retry / operator reselection / read-only diagnostics / escalate         │
               │ prepare_guarded_profile_transition:                                     │
               │   Bedrock plan review ─► hard gate + human approval ─► virtual eIM      │
-              │   enable ─► verify registration AND app telemetry ─► rollback if not    │
+              │   enable ─► result reported? ─► verify registration, data session AND  │
+              │   app telemetry ─► rollback if not (never after a missing result)       │
               └─────────────────────────────────────────────────────────────────────────┘
                                                 │
                        loop until restored, a terminal tool, or MAX_STEPS (then escalate)
@@ -72,7 +73,17 @@ GSMA SGP.32 interface is called or claimed.
 
 ## Simulation scope and simplifications
 
-- **Cohort-level.** One incident is one cohort, for example 3,200 devices. Rates are cohort aggregates; individual devices are not simulated.
+What is modelled, what is simplified and what is left out, in telecom terms, is listed in
+[telecom-fidelity.md](telecom-fidelity.md). The short version:
+
+- **Cohort-level.** One incident is one cohort, for example 3,200 devices, assumed to be pre-segmented: same
+  symptoms, firmware, eUICC capability and owner policy. Rates are cohort aggregates, and a profile switch is applied
+  to the whole cohort in one step. Per-device eligibility, canaries and staged rollout are not simulated, even when
+  Bedrock's plan review suggests them.
+- **Retry and reselection are carrier-side.** Neither stands for a modem command, which is why both work without a
+  management path. A retry stands for the network forcing a fresh attach. Reselection stands for steering: the failing
+  network is barred for the subscription, and the devices' own automatic network selection moves to the next operator
+  the active profile allows. No AT commands are modelled.
 - **Two recovery mechanisms kept separate.** *Operator reselection* moves to another operator that the **active**
   profile already permits. A *profile switch* enables a different **installed** profile on the eUICC and needs a
   management path.
@@ -80,9 +91,13 @@ GSMA SGP.32 interface is called or claimed.
   profile registers. In Germany, management is cellular and registration is failing, so device diagnostics and
   profile changes are inadmissible there. Brazil's depot trackers keep a non-cellular gateway path, so a profile
   change can be delivered even though the active profile cannot register. Offline devices have no path at all.
-- **Profile lifecycle.** The eSIM lifecycle is reduced to a state machine: enable, IPA acknowledgement, re-registration, verification of
-  registration **and** application telemetry, and rollback if verification fails. Commands are idempotent per attempt.
-  No profile download, no cryptography, no certified SGP.32 flow.
+- **Profile lifecycle.** The eSIM lifecycle is reduced to a few milestones: the package is delivered to the IPA, the
+  eUICC result is reported back to the eIM (only if a management path still works after the switch), and then
+  registration, data session **and** application telemetry are verified. Delivery and execution are one simulated
+  step. A failed verification is rolled back by the eIM re-enabling the previous profile, which the original approval
+  covers. If the new profile cannot connect and the result cannot be reported, the device rolls back on its own (this
+  stands in for SGP.32's IPA-triggered rollback). Commands are idempotent per attempt. No profile download, no
+  cryptography, no certified SGP.32 flow.
 - **Deterministic.** There is no randomness; cloning a twin and replaying the same actions gives identical state and events.
 
 ## Keeping the answer away from the models
@@ -124,17 +139,21 @@ approval. The CLI and the UI show that id and ask a person. The CLI's `--approve
 run makes; it exists for demos, replays and the benchmark, and there the binding only prevents reuse after execution.
 This is a consistency binding inside the simulation, not authentication.
 
-**Every attempt records its eUICC transition path**, and the code refuses any path outside this list:
+**Every attempt records its profile-switch path.** These are SIMShift's own workflow states, loosely following
+SGP.32 milestones; they are not SGP.32 state names. The code refuses any path outside this list:
 
-| Path | When |
-|---|---|
-| `REQUESTED → BLOCKED` | a gate check failed; nothing is sent |
-| `REQUESTED → VALIDATED → AWAITING_APPROVAL` | every check passed except the human approval; nothing is sent yet |
-| `REQUESTED → VALIDATED → APPROVED → NOT_DELIVERED` | the eIM refused or could not reach the IPA |
-| `… → SENT → ACK → ENABLED → VERIFYING → SUCCEEDED` | registration and telemetry verified |
-| `… → VERIFYING → FAILED → ROLLED_BACK` (or `ROLLBACK_FAILED`) | verification failed |
+| Path | Phase | When |
+|---|---|---|
+| `REQUESTED → BLOCKED` | prepare | a gate check failed; nothing is sent |
+| `REQUESTED → VALIDATED → AWAITING_APPROVAL` | prepare | every check passed except the human approval; nothing is sent yet |
+| `… → APPROVED → NOT_DELIVERED` | deliver | the eIM refused or could not reach the IPA |
+| `… → APPROVED → DELIVERED → RESULT_REPORTED → VERIFYING → SUCCEEDED` | deliver, execute, verify | the eUICC result arrived, then registration, data session and telemetry were verified |
+| `… → RESULT_REPORTED → VERIFYING → FAILED → ROLLED_BACK` (or `ROLLBACK_FAILED`) | verify | verification failed; the eIM re-enables the previous profile |
+| `… → DELIVERED → RESULT_PENDING → VERIFYING → SUCCEEDED` | verify | no result reached the eIM, but the network shows the devices registered on an operator only the target profile allows, and service is restored |
+| `… → DELIVERED → RESULT_PENDING → VERIFYING → UNCONFIRMED` | verify | no result and no working service: the state is unknown to the eIM, so no second command is sent and a human reconciles |
 
-Verification always comes before `SUCCEEDED`, and a blocked request never reaches `SENT`.
+Verification always comes before `SUCCEEDED`, a blocked request is never `DELIVERED`, and a missing result is never
+read as success.
 
 **Decider answers are checked before they are used.** An answer whose probabilities do not cover exactly the offered
 options, do not sum to 1, whose choice is not the most probable option, or whose confidence is not
@@ -150,13 +169,44 @@ clone of the current state and reports what would have happened. Policy exclusio
 rejected option can be seen failing. A profile change still goes through the full gate, so the UI's "what if:
 evaluate_profile_change" on OFFLINE shows `REQUESTED → BLOCKED` with `management_path_reachable` failed.
 
-**Every published trace is validated in CI** (`python -m simshift.validate`): the executed tool must be the routed
+**Every published trace is validated in CI** (`python -m simshift.validate`). The twin is deterministic, so the
+validator first replays the recorded Decider and human answers through the current code. The replay must reproduce
+the recorded steps, events and outcome exactly. The same check runs on all 300 benchmark rows. Some recorded values
+are inputs that a replay cannot re-derive, so they are not verified this way: Decider's answers with their model
+name and measured latency, and Bedrock's plan reviews, explanations and reports. For the benchmark, a test checks
+each Decider timing against the server's own latency for the same call. On top of that, the executed tool must be the routed
 admissible option, an `act` route must run the Decider choice, recorded answers must pass the checks above, every
-profile enable needs a passing gate, and "restored" needs passing registration and telemetry rates.
+profile enable needs a passing gate, every passing gate needs a recorded human approval (or the scripted
+pre-approval), approve and decline steps must match the recorded answers, a device-side rollback must undo an
+authorized enable that reported no result, each switch path must agree with the eIM result it reports on, an
+unreported switch marked `SUCCEEDED` needs registration on an operator only the target profile reaches, the outcome's
+active profile must be where the profile events leave it, and "restored" needs passing registration, data session and
+telemetry rates.
 
-Retries are bounded at 5, excluded once registration is healthy, and excluded once modem diagnostics show a reset
-loop (more than 5 resets per day). Read-only diagnostics run once per incident. The loop stops after 6 steps and
-escalates.
+## Actions
+
+| Option | Stands for | Executor | Needs the management path | Changes state | Evidence it produces |
+|---|---|---|---|---|---|
+| `retry_connection` | the network forces a fresh attach, with back-off | carrier | no | retry counter; clears short congestion | rates after the attempt |
+| `try_allowed_operator` | steering to another operator the active profile allows | carrier; device's automatic selection follows | no | serving operator, same profile | rates after the move |
+| `investigate_device` | pull modem and firmware diagnostics | device agent | yes | none (read-only) | reject cause, resets per day, firmware comparison |
+| `investigate_data_path` | network-side session, APN and ingestion checks | network and backend | no | none (read-only) | data sessions, APN, ingestion errors, attach attempts seen |
+| `evaluate_profile_change` | propose a switch to an installed profile; runs only after a bound human approval | backend, then eIM to IPA | yes | enabled profile, reversible | the profile-switch path above |
+| `escalate_or_wait` | hand off with the collected evidence | human | no | none | the handoff record |
+
+## Stop conditions
+
+- **Restored:** registration, data session and application ACK all at 95% or more.
+- **Escalation:** the fallback ran, or a profile change ended in anything but `SUCCEEDED`.
+- **Waiting:** a proposal is waiting for a human.
+- **Retries** are bounded at 5 and excluded in four states:
+  - registration is already healthy;
+  - modem diagnostics show a reset loop (more than 5 resets per day);
+  - modem diagnostics show a registration reject from the serving network, so the same reject and network back-off
+    would follow;
+  - the network has seen no attach attempts at all, so there is nothing for a network-side retry to reach.
+- **Read-only diagnostics** run once per incident.
+- **Step limit:** the loop stops after 6 steps and escalates.
 
 ## Scenarios
 

@@ -12,7 +12,9 @@ admissible, so no model can switch a profile on its own authority.
 
 > **Simulation disclosure.** The fleet, operators, eSIM profiles, eIM/IPA and every number in device state are
 > synthetic. No carrier, eUICC, SM-DP+ or GSMA SGP.32 operation is performed or claimed. The Decider and Bedrock
-> calls are real.
+> calls are real. One incident is one pre-segmented cohort that is decided as a unit; a real fleet would also need
+> per-device checks and a staged rollout. What is modelled, simplified and left out in telecom terms:
+> [docs/telecom-fidelity.md](docs/telecom-fidelity.md).
 
 ![Recovery Decision Inspector: Brazil cohort restored after a gated, human-approved profile switch](docs/screenshots/brazil-restored.png)
 
@@ -43,8 +45,8 @@ The option set has six options, each mapped 1:1 to a registered Strands tool (de
 
 | Option | Strands tool | Kind |
 |---|---|---|
-| `retry_connection` | `simulate_retry_with_backoff` | bounded, network-side |
-| `try_allowed_operator` | `simulate_operator_reselection` | another operator **on the active profile** |
+| `retry_connection` | `simulate_retry_with_backoff` | carrier-side re-attach, bounded, with back-off |
+| `try_allowed_operator` | `simulate_operator_reselection` | carrier-side steering to another operator **on the active profile** |
 | `investigate_device` | `query_firmware_modem_diagnostics` | read-only |
 | `investigate_data_path` | `query_apn_session_app_diagnostics` | read-only |
 | `evaluate_profile_change` | `prepare_guarded_profile_transition` | advisory Bedrock plan review, then hard gate + human approval, then virtual eIM |
@@ -57,8 +59,10 @@ Before Decider sees the options, the policy removes inadmissible ones. A profile
 - before modem diagnostics show a registration reject cause.
 
 The same rules run again at the gate, together with eUICC rollback support, owner authorization and a human approval
-that is bound to that exact proposal. Every attempt records its eUICC transition path (`REQUESTED → … → VERIFYING → SUCCEEDED`, or
-`BLOCKED`, `ROLLED_BACK`, …). Details: [docs/architecture.md](docs/architecture.md).
+that is bound to that exact proposal. Retries stop once the serving network has rejected registration or no device is
+trying to attach. Every attempt records its profile-switch path (`REQUESTED → … → DELIVERED → RESULT_REPORTED →
+VERIFYING → SUCCEEDED`, or `BLOCKED`, `ROLLED_BACK`, `UNCONFIRMED`, …). A missing eUICC result is never read as
+success. Details: [docs/architecture.md](docs/architecture.md).
 
 ## Bedrock runs the loop; Decider still picks every tool
 
@@ -73,16 +77,16 @@ real Strands event loop with a scripted model to prove it ([`tests/test_orchestr
 
 | Scenario | What the agent did | Outcome |
 |---|---|---|
-| `BR_PROFILE` | Decider leans to `retry_connection` at conf 0.04, then 0.20, so the router runs the most probable read-only diagnostics instead. Modem shows reject #17. Decider picks `evaluate_profile_change` (conf 0.81). Bedrock review recommends proceeding as a staged change (advisory; the gate does not read it), gate + approval pass, virtual eIM enables profile_B | registration **and** app telemetry restored |
-| `OFFLINE` | device diagnostics and profile change excluded (no management path) → network-side check (conf 0.06, read-only) → escalate (conf 0.31, fallback) | no OTA change attempted |
+| `BR_PROFILE` | Decider leans to `retry_connection` at conf 0.04, then 0.20, so the router runs the most probable read-only diagnostics instead. Modem shows the synthetic reject cause #17, which also rules out further retries. The depot trackers keep a Wi-Fi gateway path to the eIM; without it the profile change would be removed, as in Germany. Decider picks `evaluate_profile_change` (conf 0.88). Bedrock's review recommends proceeding and suggests a staged rollout (advisory: the gate does not read it, and the twin switches the cohort in one step); gate + approval pass, virtual eIM enables profile_B | registration, data session **and** app telemetry restored |
+| `OFFLINE` | device diagnostics and profile change excluded (no management path) → network-side check (conf 0.06, read-only): no attach attempts and no periodic updates, so retry is excluded too → only escalation is left | no OTA change attempted |
 | `JP_INGEST` | retry and profile change excluded (registration healthy) → Decider picks `investigate_data_path` (conf 0.71) → ingestion regression found → modem check (conf 0.09, read-only) → escalate (only option left) | no network change; root cause handed off |
 | `DE_OPERATOR` | management rides on the failing cellular link, so device diagnostics and profile change are excluded → read-only check at conf 0.47 → Decider picks `try_allowed_operator` (conf 0.62) | recovered without touching the eSIM |
-| `FW_LOOP` | modem diagnostics (conf 0.39, read-only) find a reset loop after a firmware rollout → retries and profile change excluded → data-path check → escalate | handed to the device team; no network or eSIM change |
+| `FW_LOOP` | modem diagnostics (conf 0.39, read-only) find a reset loop on the new firmware while older firmware on the same cells is stable → retries and profile change excluded → data-path check (conf 0.29) → escalate | handed to the device team; no network or eSIM change |
 | `TRANSIENT` | Decider picks `retry_connection` (conf 0.79) | restored by one bounded retry |
 
-Single runs on 2026-10-18 and 2026-10-19. Traces: [docs/sample-runs/orchestrated/](docs/sample-runs/orchestrated/) (Bedrock-orchestrated,
-all six scenarios) and [docs/sample-runs/](docs/sample-runs/) (the first Python-loop runs of the four original
-scenarios, kept as recorded; they use the earlier trace format and still replay and validate in CI).
+Single runs on 2026-10-19. Traces: [docs/sample-runs/orchestrated/](docs/sample-runs/orchestrated/) (Bedrock runs the loop)
+and [docs/sample-runs/](docs/sample-runs/) (the plain Python loop), all six scenarios each. Decider's answers were
+identical in both. Every trace replays and validates in CI.
 Per-step numbers, latencies and the known Decider misses: [docs/measurements.md](docs/measurements.md).
 
 ## Benchmark: Decider vs Bedrock-only vs rules vs random
@@ -93,15 +97,16 @@ diagnostic that finds the cause ran first.
 
 | | rules | random | **Decider** | Bedrock | Bedrock + stated confidence |
 |---|---:|---:|---:|---:|---:|
-| Correct end state, with the evidence | 95.0% | 51.7% | **96.7%** | 91.7% | 88.3% |
-| First action acceptable | 95.0% | 46.7% | **86.7%** | 81.7% | 83.3% |
-| Chooser latency p50 | — | — | **94 ms** | 2,026 ms | 2,051 ms |
-| Bedrock tokens | 0 | 0 | **0** | 74,673 | 81,970 |
+| Correct end state, with the evidence | 95.0% | 50.0% | **96.7%** | 91.7% | 93.3% |
+| First action acceptable | 95.0% | 41.7% | **86.7%** | 83.3% | 81.7% |
+| Chooser latency p50 | — | — | **106 ms** | 2,086 ms | 2,043 ms |
+| Bedrock tokens | 0 | 0 | **0** | 73,328 | 81,604 |
 | Forbidden executions (audited) | 0 | 0 | 0 | 0 | 0 |
 
 Decider's raw first pick was the preferred tool only half the time; the confidence routing turned its uncertain picks
-into read-only evidence gathering. Bedrock picked better first tools (81.7%), but its stated confidence never dropped
-below 0.60, so the same routing never held it back. **These are synthetic incidents from families we designed**,
+into read-only evidence gathering. Bedrock picked better first tools (81.7%) but escalated half of the transient
+incidents instead of retrying, and its stated confidence never dropped below 0.55, so the same routing never held it
+back. **These are synthetic incidents from families we designed**,
 Decider ran on a laptop GPU and Bedrock in eu-central-1, and each chooser ran once. Read the caveats in
 [docs/measurements.md](docs/measurements.md#benchmark) before quoting any of it.
 
@@ -110,7 +115,7 @@ Decider ran on a laptop GPU and Bedrock in eu-central-1, and each chooser ran on
 ```bash
 git clone https://github.com/HDGoldi/simshift-agent && cd simshift-agent
 make install                     # or: uv venv && uv pip install -e . pytest
-make test                        # 100 tests + trace validation; no Decider server or AWS needed
+make test                        # 138 tests + trace validation; no Decider server or AWS needed
 make ui                          # Recovery Decision Inspector on recorded real Decider answers: http://127.0.0.1:8090
 make replay                      # re-run all six recorded traces against the current code
 ```
@@ -141,15 +146,15 @@ matches that exact proposal. `--approve` is a scripted pre-approval of every pro
 replays and the benchmark. Without a terminal and without `--approve`, the proposal stays pending.
 
 The UI binds to 127.0.0.1 only and has no authentication. It shows the state sent to Decider, the removed options and
-why, Decider's probabilities, the route, the gate checklist, the eUICC transition path, counterfactuals on a cloned
+why, Decider's probabilities, the route, the gate checklist, the profile-switch path, counterfactuals on a cloned
 twin, and Bedrock's plan review and explanation.
 
-![OFFLINE: Decider escalates, and a forced profile change on a clone is blocked by the gate](docs/screenshots/offline-blocked.png)
+![OFFLINE: only escalation is left, and a forced profile change on a clone is blocked by the gate](docs/screenshots/offline-blocked.png)
 
 ## Tests
 
-`make test` runs 100 tests and validates every published trace and the benchmark file. Without AWS credentials and a
-Decider server, 99 pass and the real-Decider test skips (set `SIMSHIFT_REQUIRE_DECIDER=1` to make that a failure).
+`make test` runs 138 tests and validates every published trace and the benchmark file. Without AWS credentials and a
+Decider server, 137 pass and the real-Decider test skips (set `SIMSHIFT_REQUIRE_DECIDER=1` to make that a failure).
 Bedrock is never called in tests. The acceptance properties covered:
 - Decider's choice controls which Strands tool runs; Bedrock in orchestrator mode cannot change it.
 - Excluded options are never offered and are denied on any call path; an independent audit counts violations.
@@ -158,7 +163,11 @@ Bedrock is never called in tests. The acceptance properties covered:
 - A blocked, failed or rolled-back profile change ends in a handoff, never a silent stop; a failed Bedrock review is
   recorded and the proposal still goes to the gate.
 - The UI refuses requests from other web pages and rebound host names.
-- Brazil restores both registration and telemetry; a failed verification rolls back.
+- Brazil restores registration, data session and telemetry; a failed verification rolls back.
+- A switch whose result never reaches the eIM counts as done only if the network shows the devices on an operator
+  that only the target profile reaches and service is restored. Otherwise it ends `UNCONFIRMED` and is handed off
+  with no second command. If the new profile cannot connect, the device rolls back on its own.
+- Retries stop after a registration reject and when no device is trying to attach.
 - No hidden truth reaches Decider, Bedrock or the UI.
 - A Decider outage, a malformed or inconsistent answer, or an off-menu answer fails closed.
 - Every published trace replays through the current code to the same tools and outcome, and passes the validator.

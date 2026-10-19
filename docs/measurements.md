@@ -1,6 +1,6 @@
 # Measurements (what was actually observed)
 
-All numbers below were measured on 2026-10-18 and 2026-10-19 on synthetic incidents. The agent and Decider are not hosted on AWS
+All numbers below were measured on 2026-10-18 and 2026-10-19 on synthetic incidents; every run and benchmark figure is from 2026-10-19, on the current code. The agent and Decider are not hosted on AWS
 yet; only the Bedrock calls run on AWS. Not yet verified: Decider latency and memory on AWS hardware, and the
 AgentCore Runtime deployment. This page will be updated once the AWS deployment exists.
 
@@ -12,11 +12,12 @@ Model `StrandsAgents/strands-decider-2B-qwen3.5-v1-2610`, repo `strands-labs/str
 |---|---|---|---|
 | MLX (in-process) | Apple M4 Max laptop | median 401 ms (5 calls, 4 options) | 4.8 GB |
 | MLX (HTTP server), first agent runs | same | 367–517 ms per decision | — |
-| MLX (HTTP server), later runs | same | median 122 ms (108–145, 12 decisions in the orchestrated runs); p50 92 ms, p95 118 ms (135 decisions in the benchmark) | — |
+| MLX (HTTP server), later runs | same | median 118 ms (91–125, 11 decisions in the plain-loop runs), median 124 ms (101–131, 11 decisions in the orchestrated runs); benchmark: see below | — |
 | torch CPU (in-process) | same laptop, CPU only | about 1.0 s | 12.1 GB (fp32) |
 
-The server's `latency_ms` field is what is reported here; the benchmark table further down reports client-side wall
-clock per choice (p50 94 ms, p95 119 ms for the same 135 decisions), so that Decider and Bedrock are timed the same way. The later runs were faster on the same long-running server; it
+The server's `latency_ms` field is what is reported here (in the benchmark: p50 105 ms, p95 122 ms over 125
+decisions). The benchmark table further down reports client-side wall clock per choice (p50 106 ms, p95 123 ms for
+the same decisions), so that Decider and Bedrock are timed the same way. The later runs were faster on the same long-running server; it
 reports `prefix_cache: true`, and the incidents share most of their prompt, which is the likely reason. We did not
 isolate the cause. The first-ever load took about 450 s, almost all of it downloading the ~4.3 GB base model; a
 cached load takes about 2 s. Upstream publishes about 115 ms on an RTX 3090 for an older checkpoint. We have **not**
@@ -24,40 +25,46 @@ reproduced that number on a GPU.
 
 ## Agent runs (real Decider + real Bedrock, synthetic fleet)
 
-Traces: [`docs/sample-runs/`](sample-runs/), recorded 2026-10-18 with the first version of the agent (earlier trace
-format; they still replay and validate). Bedrock model: `eu.anthropic.claude-haiku-5-5` (eu-central-1).
-Act threshold: confidence ≥ 0.5.
+Traces: [`docs/sample-runs/`](sample-runs/), recorded 2026-10-19 with `python -m simshift.agent <S> --approve` (the
+plain Python loop; `--approve` is the scripted pre-approval). Bedrock model: `eu.anthropic.claude-haiku-5-5`
+(eu-central-1). Act threshold: confidence ≥ 0.5.
 
 | Scenario | Step | Options offered | Decider top choice (p, conf) | Route → tool run | Result |
 |---|---|---|---|---|---|
 | BR_PROFILE | 1 | 4 | retry_connection (0.28, 0.04) | gather_evidence → data-path diagnostics | |
-| | 2 | 3 | retry_connection (0.47, 0.20) | gather_evidence → modem diagnostics | reject #17 found |
-| | 3 | 3 | evaluate_profile_change (0.87, 0.81) | act → guarded profile transition | **restored** (Bedrock review: proceed, staged) |
+| | 2 | 3 | retry_connection (0.47, 0.20) | gather_evidence → modem diagnostics | reject #17 found; retry now excluded |
+| | 3 | 2 | evaluate_profile_change (0.94, 0.88) | act → guarded profile switch | **restored** (Bedrock review: proceed, advisory) |
 | DE_OPERATOR | 1 | 4 | try_allowed_operator (0.60, 0.47) | gather_evidence → data-path diagnostics | |
 | | 2 | 3 | try_allowed_operator (0.75, 0.62) | act → operator reselection | **restored**, no eSIM change |
 | JP_INGEST | 1 | 3 | investigate_data_path (0.81, 0.71) | act → data-path diagnostics | ingestion regression found |
 | | 2 | 2 | escalate_or_wait (0.54, 0.09) | gather_evidence → modem diagnostics | modem healthy |
-| | 3 | 1 | — (no model call) | fallback → escalate | handed off, no network change |
-| OFFLINE | 1 | 3 | investigate_data_path (0.37, 0.06) | gather_evidence → data-path diagnostics | no attach attempts at all |
-| | 2 | 2 | escalate_or_wait (0.66, 0.31) | fallback → escalate | no OTA change attempted |
+| | 3 | 1 | no model call | fallback → escalate | handed off, no network change |
+| OFFLINE | 1 | 3 | investigate_data_path (0.37, 0.06) | gather_evidence → data-path diagnostics | no attach attempts and no periodic updates; retry now excluded |
+| | 2 | 1 | no model call | fallback → escalate | no OTA change attempted |
+| FW_LOOP | 1 | 4 | retry_connection (0.54, 0.39) | gather_evidence → modem diagnostics | reset loop on the new firmware; older firmware stable on the same cells |
+| | 2 | 2 | escalate_or_wait (0.65, 0.29) | gather_evidence → data-path diagnostics | sessions flapping, APN and ingestion healthy |
+| | 3 | 1 | no model call | fallback → escalate | handed to the device team |
+| TRANSIENT | 1 | 4 | retry_connection (0.84, 0.79) | act → bounded retry | **restored** |
 
-`conf` is Decider's derived confidence `(N·p_max − 1)/(N − 1)`, not a calibrated probability of being correct.
+`conf` is Decider's derived confidence `(N·p_max − 1)/(N − 1)`, not a calibrated probability of being correct. With
+two options offered, the same p gives a higher confidence than with three, which is why Brazil's step 3 rose from
+0.81 (three options, before the reject rule) to 0.88.
 
 ### Orchestrated runs (Bedrock runs the loop, Decider picks every tool)
 
 Traces: [`docs/sample-runs/orchestrated/`](sample-runs/orchestrated/), recorded 2026-10-19 with
-`python -m simshift.orchestrator` on the current code. In every run Bedrock called `advance_recovery` until the
-incident was terminal (no deterministic finish was needed), and Decider's answers for the four original scenarios were
-identical to the table above.
+`python -m simshift.orchestrator <S> --approve`. In every run Bedrock called `advance_recovery` until the incident
+was terminal, so no deterministic finish was needed. Decider's answers were identical to the plain-loop runs above
+in all six scenarios.
 
-| Scenario | Steps (`advance_recovery` calls) | Decider choices (p, conf) → route | Outcome | Simulated minutes | Bedrock tokens in / out |
-|---|---|---|---|---|---|
-| BR_PROFILE | 3 | as above | restored, 1 profile change | 55 | 8,708 / 1,049 |
-| DE_OPERATOR | 2 | as above | restored, no eSIM change | 20 | 4,986 / 713 |
-| JP_INGEST | 3 | as above | escalated with the ingestion finding | 85 | 7,537 / 748 |
-| OFFLINE | 2 | as above | escalated, no OTA command | 70 | 5,072 / 613 |
-| FW_LOOP | 3 | retry_connection (0.54, 0.39) → gather_evidence: modem diagnostics; escalate_or_wait (0.62, 0.25) → gather_evidence: data-path diagnostics; only the fallback left | escalated with the reset-loop finding | 85 | 7,511 / 769 |
-| TRANSIENT | 1 | retry_connection (0.84, 0.79) → act | restored by one retry | 5 | 3,171 / 529 |
+| Scenario | `advance_recovery` calls | Outcome | Simulated minutes | Bedrock tokens in / out |
+|---|---|---|---|---|
+| BR_PROFILE | 3 | restored, 1 profile change | 55 | 8,858 / 1,096 |
+| DE_OPERATOR | 2 | restored, no eSIM change | 20 | 5,134 / 700 |
+| JP_INGEST | 3 | escalated with the ingestion finding | 85 | 7,666 / 684 |
+| OFFLINE | 2 | escalated, no OTA command | 70 | 5,277 / 849 |
+| FW_LOOP | 3 | escalated with the reset-loop finding | 85 | 7,824 / 818 |
+| TRANSIENT | 1 | restored by one retry | 5 | 3,467 / 669 |
 
 Bedrock token counts are the Strands `accumulated_usage` of the orchestrating agent. The BR_PROFILE run also made one
 plan-review call inside the profile-change tool, which is not included in that count.
@@ -76,45 +83,53 @@ end for application and firmware incidents only if the diagnostic that finds the
 
 | Metric | rules | random | **decider** | bedrock | bedrock+conf |
 |---|---:|---:|---:|---:|---:|
-| Correct end state, with the evidence | 95.0% | 51.7% | **96.7%** | 91.7% | 88.3% |
-| First action acceptable | 95.0% | 46.7% | **86.7%** | 81.7% | 83.3% |
-| First choice = preferred tool | 95.0% | 31.7% | 50.0% | 81.7% | 81.7% |
+| Correct end state, with the evidence | 95.0% | 50.0% | **96.7%** | 91.7% | 93.3% |
+| First action acceptable | 95.0% | 41.7% | **86.7%** | 83.3% | 81.7% |
+| First choice = preferred tool | 95.0% | 28.3% | 50.0% | 81.7% | 81.7% |
 | Unnecessary profile changes | 0 | 0 | 0 | 0 | 0 |
 | Forbidden executions (audited) | 0 | 0 | 0 | 0 | 0 |
-| Mean steps | 1.93 | 2.05 | 2.58 | 1.70 | 1.72 |
-| Mean simulated minutes | 52.3 | 62.6 | 54.5 | 50.8 | 53.8 |
-| Chooser latency p50 / p95 | — | — | **94 / 119 ms** | 2,026 / 3,334 ms | 2,051 / 3,292 ms |
-| Bedrock tokens (in / out) | 0 | 0 | **0** | 47,679 / 26,994 | 50,040 / 31,930 |
+| Mean steps | 1.93 | 1.98 | 2.58 | 1.72 | 1.73 |
+| Mean simulated minutes | 52.3 | 61.5 | 54.5 | 52.0 | 51.2 |
+| Chooser latency p50 / p95 | — | — | **106 / 123 ms** | 2,086 / 3,431 ms | 2,043 / 3,050 ms |
+| Bedrock tokens (in / out) | 0 | 0 | **0** | 47,067 / 26,261 | 50,423 / 31,181 |
 
 `bedrock` asks Haiku 5.5 to name one option; with no probabilities, the router always acts on it. `bedrock+conf`
 asks for an option and a 0–1 confidence, turns that into the distribution with the same derived confidence, and
 routes it with the same 0.5 threshold and read-only fallback as Decider.
 
 How to read it:
-- **Decider's raw first pick was the preferred tool only half the time, yet 58 of 60 incidents ended correctly.** The
-  confidence routing did that. The 17 first answers at confidence ≥ 0.5 all picked the preferred tool. Of the 43
-  below 0.5, 13 did; the router ran the most probable read-only check instead, and 35 of those 43 first actions were
-  acceptable. The 0.5 threshold was set before this run and not tuned on it.
-- **Bedrock's stated confidence did not help.** All 92 stated confidences were between 0.60 and 0.82, so the 0.5
-  threshold never held an answer back, and `bedrock+conf` did slightly worse than `bedrock`.
-- **Bedrock picked the preferred first tool more often** (81.7%) but did worse on transient incidents: it always
-  started with modem diagnostics and then escalated instead of retrying in 4 of 10. It also escalated one application
-  incident before the data-path check. 6 of its 100 answers (8 for `bedrock+conf`) were unusable, at least 5 of them
-  cut off at the 512-token output limit; each went to the fallback. Token counts include the cut-off calls.
-- **Decider was about 20 times faster per choice** (p50 94 ms on a laptop GPU vs 2.0 s for a Bedrock call) and used
+- **Decider's raw first pick was the preferred tool only half the time, yet 58 of 60 incidents ended correctly.**
+  The confidence routing did that.
+  - The 17 first answers at confidence ≥ 0.5 all picked the preferred tool.
+  - Of the 43 below 0.5, 13 did. The router ran the most probable read-only check instead, and 35 of those 43 first
+    actions were acceptable.
+  - The 0.5 threshold was set before this run and not tuned on it.
+- **Bedrock's stated confidence did not separate good answers from bad.** All 98 stated confidences were between 0.55
+  and 0.85, so the 0.5 threshold never held an answer back. `bedrock+conf` ended one incident more correctly than
+  `bedrock`. One run per chooser cannot tell that apart from noise.
+- **Bedrock picked the preferred first tool more often** (81.7%) but did worse on transient incidents.
+  - It nearly always started with modem diagnostics and then escalated instead of retrying: 5 of 10 for `bedrock`,
+    4 of 10 for `bedrock+conf`.
+  - 4 of its 99 answers (3 of 101 for `bedrock+conf`) were cut off at the 512-token output limit; each went to the
+    fallback. Token counts include the cut-off calls.
+- **Decider was about 20 times faster per choice** (p50 106 ms on a laptop GPU vs 2.1 s for a Bedrock call) and used
   no Bedrock tokens. These run on different hardware, so this is not a like-for-like model comparison; it is what an
   agent built this way experiences.
 - **The guardrails, not the chooser, kept every strategy safe.** No chooser made a forbidden execution or an
   unnecessary profile change. The chooser decides how fast and whether recovery happens.
+- **Compared with the earlier run on the previous code** (before the retry exclusions after a reject and for silent
+  devices), Decider and rules scored the same. Random dropped from 51.7% to 50.0%, and `bedrock+conf` rose from 88.3%
+  to 93.3%. Bedrock answers vary between runs, so a single run cannot attribute that rise to the rule change.
 
 Caveats, all of which apply to every number above:
-- The incidents are synthetic. Each family was designed with observable signals that point to its cause, and the
-  option descriptions were written by us. Treat this as a check that the pieces work together, not as field evidence.
-- The seeds were never used for tuning, but the families are the same ones the six hand-written scenarios come from.
-- "Rules" is a hand-written runbook written from domain knowledge, not fitted to the generator. It checks the
-  recent-firmware flag before the attach trend, so it misses the 3 transient incidents where that flag is set as a
-  distractor.
-- One run per chooser; no confidence intervals.
+- **Synthetic incidents.** Each family was designed with observable signals that point to its cause, and we wrote the
+  option descriptions. Treat this as a check that the pieces work together, not as field evidence.
+- **Seeds versus families.** The seeds were never used for tuning, but the families are the same ones the six
+  hand-written scenarios come from.
+- **The rules baseline.** "Rules" is a hand-written runbook written from domain knowledge, not fitted to the
+  generator. It checks the recent-firmware flag before the attach trend, so it misses the 3 transient incidents where
+  that flag is set as a distractor.
+- **One run per chooser;** no confidence intervals.
 
 ## Known Decider misses and what we changed
 
