@@ -12,7 +12,7 @@
 | Reusable Decider decision pattern, clearly labeled: typed question + options, wiring, short note | [`patterns/capability_aware_router/`](../patterns/capability_aware_router/README.md) | done |
 | Approved OSI license | [Apache-2.0](../LICENSE) | done |
 | Article on AWS Builder Center | draft: [`docs/article/article.md`](article/article.md); Builder Center link: _TBD_ | draft done, publishing pending |
-| Public demo video under 3 minutes (YouTube/Vimeo/Facebook/Youku), no unlicensed marks or music | script: [`docs/article/video-script.md`](article/video-script.md); link: _TBD_ | script done, recording pending |
+| Public demo video under 3 minutes (YouTube/Vimeo/Facebook/Youku), no unlicensed marks or music | [YouTube](https://youtu.be/wL6Ksg_yTT4) (2:56); script: [`docs/article/video-script.md`](article/video-script.md) | done |
 | Original, not previously published | first public commit 2026-10-18, during the submission period | done |
 
 Encouraged, not required: a measured latency/cost comparison against an LLM, decision accuracy, low-confidence

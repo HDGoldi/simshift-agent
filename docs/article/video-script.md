@@ -1,18 +1,21 @@
-# SIMShift demo video script (target 2:45)
+# SIMShift demo video script (final cut, 2:56)
 
-Everything shown is the real UI (`python -m simshift.web --bedrock`) with the live Decider server and Bedrock, or
-the recorded replay (`make ui`) if the Decider server is not running. Keep the SIMULATED FLEET badge in frame.
+Published: https://youtu.be/wL6Ksg_yTT4. The video is built from screenshots of the real UI (`make ui`, recorded real
+Decider answers), animated diagrams and the committed results files. The SIMULATED FLEET badge is on screen throughout.
+Narration is a synthetic voice (ElevenLabs); there is no music.
 
-| Time | Screen | Narration |
+| Time | Screen | Narration (as subtitled) |
 |---|---|---|
-| 0:00–0:15 | UI home, incident list | "When IoT devices lose connectivity, the wrong recovery action can be worse than doing nothing. SIMShift is a recovery agent that knows when not to switch. Everything here is a simulated fleet; the models are real." |
-| 0:15–0:35 | Click `BR_PROFILE`. Point at the typed question and the options table | "Strands Decider 2B answers one typed question at every step: which tool next. Before it sees the options, a deterministic policy removes the ones that are unsafe or pointless, and says why." |
-| 0:35–1:05 | Next step twice. Point at probabilities, confidence, route | "Decider leans towards retrying, but with low confidence. Below 0.5 the router does not act on that. It runs the most probable read-only check instead. The modem diagnostics find a registration reject, a synthetic cause 17, from the serving network. From now on, retrying is off the table." |
-| 1:05–1:35 | Next step. The approval dialog opens. Point at the gate checklist and the Bedrock review | "Now Decider picks a profile change at 0.88. These depot trackers can still reach the eSIM manager over a Wi-Fi gateway, so the change can be delivered. Nine of the ten checks pass: management path reachable, no other operator on this profile, reject evidence, and so on. The tenth is a human approval for this exact proposal. Bedrock reviews the plan and suggests a staged rollout, as advice only. Neither model can approve. I do." |
-| 1:35–1:55 | Approve. The transition path runs to SUCCEEDED; fleet dots turn green | "The virtual eIM delivers the switch, the device reports the result, and SIMShift checks registration, data sessions and application telemetry before it calls this restored. If verification failed, it would roll back and hand off. If the result never arrived, it would accept the switch only on independent network evidence, and otherwise hand off." |
-| 1:55–2:20 | Click `OFFLINE`, Run to end, then "What if: evaluate_profile_change" | "Same agent, different evidence. These devices have no management path, and the network check finds no device even trying to attach, so escalation is the only option left. And if someone forces a profile change on a clone, the gate blocks it before anything is sent. SIMShift never pretends an offline device accepted an OTA command." |
-| 2:20–2:40 | Benchmark table from `docs/benchmark/` | "On 60 generated incidents, the same router and gate ran five choosers. Decider ended 97% of them correctly at about a tenth of a second a choice on a laptop GPU. Bedrock choosing alone ended 92% correctly at about two seconds. On AWS, on a Fargate CPU with no GPU, a Decider choice takes about seven seconds. These are synthetic incidents we designed, so it shows the parts work together, not field results." |
-| 2:40–2:50 | Pattern README | "The reusable part is CapabilityAwareRouter: filter, decide, route, gate. No telecom code. Link in the description." |
+| 0:00–0:11 | Fleet dot grid turns red; title card | "When IoT devices lose connectivity, the wrong recovery action can be worse than doing nothing. SIMShift is a recovery agent that knows when not to switch." |
+| 0:11–0:23 | Incident list (real UI) and the two model chips | "Everything here runs on a simulated fleet. The models are real: Strands Decider 2B picks each tool, and Amazon Bedrock reviews and reports." |
+| 0:23–0:42 | Options table (real UI) beside the filter, decide, route, gate stages | "At every step, Decider answers one typed question: which tool next? A deterministic policy first removes the unsafe or pointless options, and says why. Decider chooses. A router decides whether to act. A gate checks again." |
+| 0:42–1:08 | Confidence meter with the 0.5 threshold, then the decision trace (real UI) | "In Brazil, 3,200 trackers can't attach. Decider leans toward a retry, but at confidence 0.04. Below 0.5, the router won't act. It runs a read-only check instead: the data path, then the modem. The network rejects registration: a synthetic cause 17. Retrying is off the table." |
+| 1:08–1:34 | Meter at 0.88, the ten gate checks, the approval dialog (real UI) and the recorded Bedrock review | "Now Decider picks a profile change, at 0.88. Depot trackers reach the eSIM manager over Wi-Fi, so the change can be delivered. Ten checks must pass. Nine are automatic. The tenth is a human approval, for this exact proposal. Bedrock reviews the plan, as advice only. Neither model can approve. I do." |
+| 1:34–1:53 | Transition stepper to SUCCEEDED; fleet goes from red to green | "The virtual eIM delivers the switch, and the device reports back. SIMShift checks registration, data sessions and telemetry before calling it restored. Failed verification rolls back and hands off. A missing result needs network evidence, or hands off." |
+| 1:53–2:08 | OFFLINE incident (real UI) and the blocked counterfactual | "Same agent, different evidence. These devices have no management path, and none is trying to attach. So it escalates. Force a profile change on a clone, and the gate blocks it before anything is sent." |
+| 2:08–2:21 | AWS architecture: AgentCore Runtime, private Fargate Decider, Bedrock | "And it runs on AWS. The agent runs on Bedrock AgentCore Runtime, Decider on a private Fargate task. All six scenarios were recorded there." |
+| 2:21–2:44 | Accuracy and latency table, five choosers | "On 60 generated incidents, Decider ended 97% correct, about a tenth of a second per choice on a laptop GPU. Bedrock alone: 92%, about two seconds. On a Fargate CPU, Decider takes about seven seconds. Synthetic incidents, not field results." |
+| 2:44–2:56 | CapabilityAwareRouter code excerpt, then the repo link | "The reusable part: CapabilityAwareRouter. Filter, decide, route, gate. No telecom code. The link is in the description." |
 
-Recording notes: use the committed results file for every number spoken. Do not show terminals with AWS profile names
-or account IDs. No music unless it is licensed for this use.
+Notes: every number comes from the committed results files (`docs/sample-runs/`, `docs/benchmark/`,
+`docs/measurements.md`). The Bedrock plan review shown in scene 5 is the recorded one from `docs/sample-runs/orchestrated/BR_PROFILE.json`.
