@@ -202,7 +202,7 @@ Done: the agent, the pattern, six scenarios, the orchestrator mode, the UI and t
 Bedrock in eu-central-1), and the AWS deployment (AgentCore Runtime plus Decider on Fargate) with six recorded runs.
 
 Next:
-- Publish the article ([draft](docs/article/article.md)). The demo video is on [YouTube](https://youtu.be/wL6Ksg_yTT4) ([script](docs/article/video-script.md)).
+- Submitted. Article: [AWS Builder Center](https://builder.aws.com/project/3KxQPlhQAgzMtL7PslCriE3aywA/simshift-a-recovery-agent-that-knows-when-not-to-switch-strands-decider-2b-amazon-bedrock) ([source](docs/article/article.md)). Demo video: [YouTube](https://youtu.be/wL6Ksg_yTT4) ([script](docs/article/video-script.md)).
 
 Submission status: [docs/hackathon-submission.md](docs/hackathon-submission.md).
 

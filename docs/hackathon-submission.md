@@ -11,7 +11,7 @@
 | Public code repository with the agent's source | this repository | done |
 | Reusable Decider decision pattern, clearly labeled: typed question + options, wiring, short note | [`patterns/capability_aware_router/`](../patterns/capability_aware_router/README.md) | done |
 | Approved OSI license | [Apache-2.0](../LICENSE) | done |
-| Article on AWS Builder Center | draft: [`docs/article/article.md`](article/article.md); Builder Center link: _TBD_ | draft done, publishing pending |
+| Article on AWS Builder Center | [AWS Builder Center](https://builder.aws.com/project/3KxQPlhQAgzMtL7PslCriE3aywA/simshift-a-recovery-agent-that-knows-when-not-to-switch-strands-decider-2b-amazon-bedrock); source: [`docs/article/article.md`](article/article.md) | done |
 | Public demo video under 3 minutes (YouTube/Vimeo/Facebook/Youku), no unlicensed marks or music | [YouTube](https://youtu.be/wL6Ksg_yTT4) (2:56); script: [`docs/article/video-script.md`](article/video-script.md) | done |
 | Original, not previously published | first public commit 2026-10-18, during the submission period | done |
 
